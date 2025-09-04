@@ -1,6 +1,13 @@
 "use client";
 import { db } from "./firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 
 export type Doctor = {
   uid: string;
@@ -8,6 +15,14 @@ export type Doctor = {
   specialty: string;
 };
 
+export type DoctorInfo = {
+  id: string;
+  uid: string;
+  name: string;
+  email: string;
+  specialty: string;
+  approved: boolean;
+};
 export async function getApprovedDoctors(): Promise<Doctor[]> {
   const q = query(
     collection(db, "users"),
@@ -23,4 +38,12 @@ export async function getApprovedDoctors(): Promise<Doctor[]> {
       specialty: data.specialty || "General",
     };
   });
+}
+
+export async function getDoctorInfo(uid: string) {
+  if (!uid) return null; // 👈 prevent invalid call
+  const snap = await getDoc(doc(db, 'users', uid));
+  if (!snap.exists()) return null;
+  const data = snap.data() as any;
+  return { id: snap.id, ...data };
 }

@@ -1,4 +1,4 @@
-import Protected from "@/components/Protected";
+import ProtectedLayout from "@/components/ProtectedLayout";
 
 export default function AdminLayout({
   children,
@@ -6,11 +6,11 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Protected allow="admin">
+    <ProtectedLayout allowedRoles={["admin"]}>
       <div className="grid gap-6 py-6">
         <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
         {children}
       </div>
-    </Protected>
+    </ProtectedLayout>
   );
 }

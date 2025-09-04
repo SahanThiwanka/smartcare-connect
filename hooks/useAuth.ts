@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { getUserRole } from "@/lib/auth";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
-type Role = 'patient' | 'doctor' | 'admin' | null;
+type Role = "patient" | "doctor" | "admin" | null;
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -12,17 +12,30 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (u) {
-        const r = await getUserRole(u.uid);
-        setRole(r);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+
+      if (firebaseUser) {
+        try {
+          const snap = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (snap.exists()) {
+            const data = snap.data();
+            setRole(data.role as Role);
+          } else {
+            setRole(null);
+          }
+        } catch (err) {
+          console.error("Error fetching role:", err);
+          setRole(null);
+        }
       } else {
         setRole(null);
       }
+
       setLoading(false);
     });
-    return () => unsub();
+
+    return () => unsubscribe();
   }, []);
 
   return { user, role, loading };

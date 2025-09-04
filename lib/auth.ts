@@ -4,6 +4,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
@@ -42,4 +44,26 @@ export async function getUserRole(uid: string): Promise<Role | null> {
   if (!snap.exists()) return null;
   const data = snap.data() as any;
   return (data.role as Role) ?? null;
+}
+
+const googleProvider = new GoogleAuthProvider();
+
+export async function loginWithGoogle() {
+  const res = await signInWithPopup(auth, googleProvider);
+  const user = res.user;
+
+  // check if user doc exists
+  const snap = await getDoc(doc(db, "users", user.uid));
+  if (!snap.exists()) {
+    // new user → ask them to complete profile
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      email: user.email,
+      role: null, // let them choose later?
+      profileCompleted: false,
+      createdAt: Date.now(),
+    });
+  }
+
+  return user;
 }
