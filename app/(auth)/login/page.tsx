@@ -1,13 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   signInWithEmailAndPassword,
   sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { loginWithGoogle } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth"; // 👈 added
 
 // 🔹 Helper: translate Firebase errors to friendly messages
 function getErrorMessage(code: string) {
@@ -31,12 +33,24 @@ function getErrorMessage(code: string) {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { user, role, loading: authLoading } = useAuth(); // 👈 useAuth hook
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // 👇 Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (role === "patient") router.replace("/patient/profile");
+      else if (role === "doctor") router.replace("/doctor/profile");
+      else if (role === "admin") router.replace("/admin");
+      else router.replace("/");
+    }
+  }, [user, role, authLoading, router]);
+
+  // 🔹 Email/Password Login
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -53,10 +67,11 @@ export default function LoginPage() {
         return;
       }
 
-      // Fetch user role from Firestore
       const snap = await getDoc(doc(db, "users", res.user.uid));
       if (!snap.exists()) {
-        setError("User record not found.");
+        setError(
+          "No account found. Please register first as Patient or Doctor."
+        );
         setLoading(false);
         return;
       }
@@ -74,7 +89,45 @@ export default function LoginPage() {
         router.push("/");
       }
     } catch (err: any) {
-      // 👇 convert Firebase error code → friendly message
+      setError(getErrorMessage(err.code || err.message));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // 🔹 Google Login (no registration allowed here)
+  async function handleGoogleLogin() {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const provider = new GoogleAuthProvider();
+      const res = await signInWithPopup(auth, provider);
+      const user = res.user;
+
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (!snap.exists()) {
+        await auth.signOut(); // cleanup
+        setError(
+          "No account found. Please register first as Patient or Doctor."
+        );
+        setLoading(false);
+        return;
+      }
+
+      const data = snap.data();
+      if (!data.profileCompleted) {
+        router.push("/setup-profile");
+      } else if (data.role === "patient") {
+        router.push("/patient/profile");
+      } else if (data.role === "doctor") {
+        router.push("/doctor/profile");
+      } else if (data.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
+    } catch (err: any) {
       setError(getErrorMessage(err.code || err.message));
     } finally {
       setLoading(false);
@@ -94,13 +147,18 @@ export default function LoginPage() {
     }
   }
 
+  if (authLoading || user) {
+    // prevent flicker while redirecting
+    return <div className="text-white p-6">Loading...</div>;
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-black">
       <form
         onSubmit={handleLogin}
         className="w-full max-w-sm rounded border bg-gray-600 p-6 shadow"
       >
-        <h1 className="mb-4 text-xl font-semibold text-black">Login</h1>
+        <h1 className="mb-4 text-xl font-semibold text-white">Login</h1>
 
         <input
           type="email"
@@ -130,21 +188,15 @@ export default function LoginPage() {
         </button>
 
         <div className="mt-6 flex flex-col gap-3">
-          <div className="text-center text-gray-500">or</div>
+          <div className="text-center text-gray-200">or</div>
 
           <button
             type="button"
-            onClick={async () => {
-              try {
-                const user = await loginWithGoogle();
-                router.push("/setup-profile");
-              } catch (err: any) {
-                setError(getErrorMessage(err.code || err.message));
-              }
-            }}
+            onClick={handleGoogleLogin}
+            disabled={loading}
             className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-md"
           >
-            Continue with Google
+            {loading ? "Checking..." : "Continue with Google"}
           </button>
         </div>
 
