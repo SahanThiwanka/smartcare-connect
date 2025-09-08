@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -9,7 +9,6 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { useAuth } from "@/hooks/useAuth"; // 👈 added
 
 // 🔹 Helper: translate Firebase errors to friendly messages
 function getErrorMessage(code: string) {
@@ -29,21 +28,10 @@ function getErrorMessage(code: string) {
 
 export default function PatientRegisterPage() {
   const router = useRouter();
-  const { user, role, loading: authLoading } = useAuth(); // 👈 check login
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // 👇 Redirect if already logged in
-  useEffect(() => {
-    if (!authLoading && user) {
-      if (role === "patient") router.replace("/patient/profile");
-      else if (role === "doctor") router.replace("/doctor/profile");
-      else if (role === "admin") router.replace("/admin");
-      else router.replace("/");
-    }
-  }, [user, role, authLoading, router]);
 
   // 🔹 Email/Password Registration
   async function handleRegister(e: React.FormEvent) {
@@ -90,6 +78,7 @@ export default function PatientRegisterPage() {
       const res = await signInWithPopup(auth, provider);
       const user = res.user;
 
+      // check if user already exists
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()) {
         await auth.signOut();
@@ -100,11 +89,12 @@ export default function PatientRegisterPage() {
         return;
       }
 
+      // new patient registration with Google
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
         role: "patient",
-        verified: true,
+        verified: true, // Google accounts are already verified
         profileCompleted: false,
         createdAt: Date.now(),
       });
@@ -118,10 +108,6 @@ export default function PatientRegisterPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  if (authLoading || user) {
-    return <div className="text-white p-6">Loading...</div>;
   }
 
   return (

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   signInWithEmailAndPassword,
@@ -9,7 +9,6 @@ import {
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { useAuth } from "@/hooks/useAuth"; // 👈 added
 
 // 🔹 Helper: translate Firebase errors to friendly messages
 function getErrorMessage(code: string) {
@@ -33,22 +32,11 @@ function getErrorMessage(code: string) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, role, loading: authLoading } = useAuth(); // 👈 useAuth hook
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // 👇 Redirect if already logged in
-  useEffect(() => {
-    if (!authLoading && user) {
-      if (role === "patient") router.replace("/patient/profile");
-      else if (role === "doctor") router.replace("/doctor/profile");
-      else if (role === "admin") router.replace("/admin");
-      else router.replace("/");
-    }
-  }, [user, role, authLoading, router]);
 
   // 🔹 Email/Password Login
   async function handleLogin(e: React.FormEvent) {
@@ -145,11 +133,6 @@ export default function LoginPage() {
     } catch (err: any) {
       setError(getErrorMessage(err.code || err.message));
     }
-  }
-
-  if (authLoading || user) {
-    // prevent flicker while redirecting
-    return <div className="text-white p-6">Loading...</div>;
   }
 
   return (

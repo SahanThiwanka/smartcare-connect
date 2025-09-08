@@ -1,32 +1,10 @@
-// components/Navbar.tsx
 "use client";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth";
-import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
 
 export default function Navbar() {
-  const { user, role, loading } = useAuth();
-  const [profileCompleted, setProfileCompleted] = useState<boolean | null>(
-    null
-  );
-
-  // fetch profile completion status once user is ready
-  useEffect(() => {
-    async function fetchProfile() {
-      if (user) {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        if (snap.exists()) {
-          setProfileCompleted(snap.data().profileCompleted || false);
-        }
-      } else {
-        setProfileCompleted(null);
-      }
-    }
-    if (!loading) fetchProfile();
-  }, [user, loading]);
+  const { user, role, profileCompleted, approved, loading } = useAuth();
 
   return (
     <header className="w-full border-b bg-black text-white">
@@ -39,32 +17,45 @@ export default function Navbar() {
           <div className="text-sm text-gray-400">Loading...</div>
         ) : user ? (
           <div className="flex items-center gap-4">
-            {/* ✅ Only show dashboard links if profile is complete */}
-            {profileCompleted && role === "patient" && (
+            {/* Patient */}
+            {role === "patient" && (
               <>
-                <Link href="/patient/profile">Profile</Link>
-                <Link href="/patient/appointments">Appointments</Link>
-                <Link href="/patient/records">Records</Link>
-                <Link href="/patient/history">History</Link>
+                {!profileCompleted ? (
+                  <Link href="/setup-profile">Complete Profile</Link>
+                ) : (
+                  <>
+                    <Link href="/patient/profile">Profile</Link>
+                    <Link href="/patient/appointments">Appointments</Link>
+                    <Link href="/patient/records">Records</Link>
+                    <Link href="/patient/history">History</Link>
+                  </>
+                )}
               </>
             )}
-            {profileCompleted && role === "doctor" && (
+
+            {/* Doctor */}
+            {role === "doctor" && (
               <>
-                <Link href="/doctor/profile">Profile</Link>
-                <Link href="/doctor/patients">Patients</Link>
-                <Link href="/doctor/appointments">Appointments</Link>
+                {!profileCompleted ? (
+                  <Link href="/setup-profile">Complete Profile</Link>
+                ) : approved === false ? (
+                  <span className="text-yellow-400">Awaiting Approval</span>
+                ) : (
+                  <>
+                    <Link href="/doctor/profile">Profile</Link>
+                    <Link href="/doctor/patients">Patients</Link>
+                    <Link href="/doctor/appointments">Appointments</Link>
+                  </>
+                )}
               </>
             )}
+
+            {/* Admin */}
             {role === "admin" && (
               <>
                 <Link href="/admin">Dashboard</Link>
                 <Link href="/admin/doctors">Approve Doctors</Link>
               </>
-            )}
-
-            {/* If profile not completed yet */}
-            {user && role !== "admin" && profileCompleted === false && (
-              <Link href="/setup-profile">Complete Profile</Link>
             )}
 
             <button

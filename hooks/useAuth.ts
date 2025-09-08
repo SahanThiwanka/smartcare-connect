@@ -1,42 +1,71 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 
 type Role = "patient" | "doctor" | "admin" | null;
+
+export type UserDoc = {
+  uid: string;
+  email?: string | null;
+  role?: Role;
+  profileCompleted?: boolean;
+  approved?: boolean;
+  [key: string]: any; // allow extra fields
+} | null;
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role>(null);
+  const [profileCompleted, setProfileCompleted] = useState(false);
+  const [approved, setApproved] = useState<boolean | null>(null);
+  const [userDoc, setUserDoc] = useState<UserDoc>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
+    let unsubDoc: (() => void) | null = null;
 
-      if (firebaseUser) {
-        try {
-          const snap = await getDoc(doc(db, "users", firebaseUser.uid));
-          if (snap.exists()) {
-            const data = snap.data();
-            setRole(data.role as Role);
-          } else {
-            setRole(null);
-          }
-        } catch (err) {
-          console.error("Error fetching role:", err);
-          setRole(null);
-        }
-      } else {
-        setRole(null);
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+
+      if (unsubDoc) {
+        unsubDoc();
+        unsubDoc = null;
       }
 
-      setLoading(false);
+      if (u) {
+        const ref = doc(db, "users", u.uid);
+        unsubDoc = onSnapshot(ref, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as any;
+            setUserDoc({ uid: u.uid, email: u.email, ...data });
+            setRole((data.role ?? null) as Role);
+            setProfileCompleted(Boolean(data.profileCompleted));
+            setApproved(data.approved ?? null);
+          } else {
+            setUserDoc(null);
+            setRole(null);
+            setProfileCompleted(false);
+            setApproved(null);
+          }
+          setLoading(false);
+        });
+      } else {
+        setUserDoc(null);
+        setRole(null);
+        setProfileCompleted(false);
+        setApproved(null);
+        setLoading(false);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubAuth();
+      if (unsubDoc) unsubDoc();
+    };
   }, []);
 
-  return { user, role, loading };
+  return { user, role, profileCompleted, approved, userDoc, loading };
 }
