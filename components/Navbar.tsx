@@ -24,6 +24,7 @@ export default function Navbar() {
                   <Link href="/setup-profile">Complete Profile</Link>
                 ) : (
                   <>
+                    <Link href="/patient/dashboard">Dashboard</Link>
                     <Link href="/patient/profile">Profile</Link>
                     <Link href="/patient/appointments">Appointments</Link>
                     <Link href="/patient/records">Records</Link>
@@ -42,6 +43,7 @@ export default function Navbar() {
                   <span className="text-yellow-400">Awaiting Approval</span>
                 ) : (
                   <>
+                    <Link href="/doctor/dashboard">Dashboard</Link>
                     <Link href="/doctor/profile">Profile</Link>
                     <Link href="/doctor/patients">Patients</Link>
                     <Link href="/doctor/appointments">Appointments</Link>

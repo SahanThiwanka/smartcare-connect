@@ -11,11 +11,11 @@ import {
 } from "firebase/firestore";
 
 export type Appointment = {
-  notes: any;
+  notes?: string;
   id?: string;
   patientId: string;
   doctorId: string;
-  date: string;
+  date: string; // ISO string recommended
   reason: string;
   status: "pending" | "approved" | "declined" | "completed";
   createdAt: number;
@@ -64,4 +64,9 @@ export async function completeAppointment(id: string, notes: string) {
     status: "completed",
     notes,
   });
+}
+
+// 👇 New: allow patients to cancel their pending bookings
+export async function cancelAppointment(id: string) {
+  await updateAppointmentStatus(id, "declined");
 }
