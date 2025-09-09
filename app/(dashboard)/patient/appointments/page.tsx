@@ -104,7 +104,7 @@ export default function PatientAppointmentsPage() {
       {/* Booking form */}
       <form
         onSubmit={onSubmit}
-        className="grid gap-3 p-4 border rounded bg-gray-50"
+        className="grid gap-3 p-4 border rounded bg-gray-700"
       >
         <select
           className="rounded border p-2"
