@@ -45,7 +45,6 @@ function formatDate(v: DateLike): string {
   }
 }
 
-
 type AppointmentWithDoctor = Appointment & { doctorName?: string };
 
 export default function PatientHistoryPage() {
@@ -77,8 +76,9 @@ export default function PatientHistoryPage() {
         );
 
         // sort newest first (by appointment date)
+        // sort newest first (by appointment date)
         withDocs.sort(
-          (a, b) => toMillis(b.date as any) - toMillis(a.date as any)
+          (a, b) => toMillis(b.date as DateLike) - toMillis(a.date as DateLike)
         );
 
         // 2. Load records
