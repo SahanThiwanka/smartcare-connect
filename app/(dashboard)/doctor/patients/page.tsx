@@ -110,7 +110,7 @@ export default function DoctorPatientsPage() {
               {isOpen && (
                 <div className="mt-3 space-y-4">
                   {/* Patient Info */}
-                  <div className="p-2 border rounded bg-gray-50 text-sm">
+                  <div className="p-2 border rounded text-sm">
                     <p>
                       <b>Phone:</b> {p.patient?.phone || "N/A"}
                     </p>

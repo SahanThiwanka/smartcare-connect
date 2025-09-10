@@ -60,7 +60,7 @@ export default function DoctorProfilePage() {
   if (!form) return <p className="p-6">No profile found.</p>;
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-black rounded shadow text-white">
+    <div className="max-w-2xl mx-auto p-6 bg-gray-600 rounded shadow text-white">
       <h1 className="text-xl font-bold mb-4">Doctor Profile</h1>
 
       {edit ? (

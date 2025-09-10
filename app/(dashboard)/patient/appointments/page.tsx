@@ -153,7 +153,7 @@ export default function PatientAppointmentsPage() {
         <h3 className="text-lg font-semibold">My Bookings</h3>
         {appointments.length === 0 && <p>No appointments yet.</p>}
         {appointments.map((a) => (
-          <div key={a.id} className="rounded border p-4 bg-white shadow">
+          <div key={a.id} className="rounded border p-4 bg-black shadow">
             <p>
               <b>Doctor:</b>{" "}
               {doctors.find((d) => d.uid === a.doctorId)?.name || a.doctorId}
@@ -168,7 +168,7 @@ export default function PatientAppointmentsPage() {
               <b>Status:</b> {a.status}
             </p>
             {a.status === "completed" && a.notes && (
-              <p className="mt-2 p-2 rounded bg-gray-100 text-sm">
+              <p className="mt-2 p-2 rounded bg-gray-600 text-sm">
                 <b>Doctor’s Notes:</b> {a.notes}
               </p>
             )}

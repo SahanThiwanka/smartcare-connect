@@ -121,7 +121,7 @@ export default function DoctorAppointmentsPage() {
           return (
             <div
               key={a.id}
-              className="rounded border p-4 bg-white shadow space-y-2"
+              className="rounded border p-4 shadow space-y-2"
             >
               <p>
                 <b>Patient:</b> {p?.fullName || a.patientId} <br />
@@ -139,7 +139,7 @@ export default function DoctorAppointmentsPage() {
                 <b>Status:</b> {a.status}
               </p>
               {a.notes && (
-                <p className="p-2 bg-gray-100 rounded">
+                <p className="p-2 bg-gray-600 rounded">
                   <b>Notes:</b> {a.notes}
                 </p>
               )}

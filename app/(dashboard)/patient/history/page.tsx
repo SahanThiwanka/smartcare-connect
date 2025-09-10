@@ -275,7 +275,7 @@ export default function PatientHistoryPage() {
         {appointments.length === 0 && <p>No appointments yet.</p>}
         <div className="grid gap-3">
           {appointments.map((a) => (
-            <div key={a.id} className="rounded border p-3 bg-gray-50">
+            <div key={a.id} className="rounded border p-3">
               <p>
                 <span className="font-semibold">Doctor:</span> {a.doctorName}
               </p>
@@ -303,7 +303,7 @@ export default function PatientHistoryPage() {
                 </span>
               </p>
               {a.status === "completed" && a.notes && (
-                <p className="mt-2 p-2 rounded bg-gray-200 text-sm">
+                <p className="mt-2 p-2 rounded bg-gray-600 text-sm">
                   <span className="font-semibold">Doctor’s Notes:</span>{" "}
                   {a.notes}
                 </p>
@@ -321,7 +321,7 @@ export default function PatientHistoryPage() {
           {records.map((r) => (
             <div
               key={r.id}
-              className="flex justify-between items-center border rounded p-2 bg-gray-50"
+              className="flex justify-between items-center border rounded p-2"
             >
               <a
                 href={r.fileUrl}
