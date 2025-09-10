@@ -22,57 +22,73 @@ export type RecordFile = {
   fileName: string;
   fileUrl: string;
   uploadedAt: number;
-  createdAt: number; // 👈 keep this as number (timestamp)
+  createdAt: number; // keep as number (timestamp)
+};
+
+// Firestore schema type (raw document)
+type RecordFileDoc = {
+  patientId: string;
+  fileName: string;
+  fileUrl: string;
+  uploadedAt: number;
+  createdAt: number | { toMillis: () => number }; // Firestore Timestamp or number
 };
 
 export async function uploadRecord(patientId: string, file: File) {
-  const storageRef = ref(
-    storage,
-    `records/${patientId}/${Date.now()}-${file.name}`
-  );
+  const storagePath = `records/${patientId}/${Date.now()}-${file.name}`;
+  const storageRef = ref(storage, storagePath);
+
   await uploadBytes(storageRef, file);
   const url = await getDownloadURL(storageRef);
 
   const timestamp = Date.now();
 
-  const record: RecordFile = {
+  const record: Omit<RecordFile, "id"> & { storagePath: string } = {
     patientId,
     fileName: file.name,
     fileUrl: url,
     uploadedAt: timestamp,
-    createdAt: timestamp, // 👈 save proper timestamp
+    createdAt: timestamp,
+    storagePath, // 👈 store path so we can delete from Storage later
   };
 
   const docRef = await addDoc(collection(db, "records"), record);
   return { id: docRef.id, ...record };
 }
 
-export async function getPatientRecords(patientId: string) {
+export async function getPatientRecords(
+  patientId: string
+): Promise<RecordFile[]> {
   const q = query(
     collection(db, "records"),
     where("patientId", "==", patientId)
   );
   const snap = await getDocs(q);
 
-  // Ensure createdAt is always a number
   return snap.docs.map((d) => {
-    const data = d.data() as any;
+    const data = d.data() as RecordFileDoc;
+
     return {
       id: d.id,
-      ...data,
+      patientId: data.patientId,
+      fileName: data.fileName,
+      fileUrl: data.fileUrl,
+      uploadedAt: data.uploadedAt,
       createdAt:
         typeof data.createdAt === "number"
           ? data.createdAt
-          : data.createdAt?.toMillis?.() || Date.now(),
-    } as RecordFile;
+          : data.createdAt.toMillis(),
+    };
   });
 }
 
-export async function deleteRecord(id: string) {
+export async function deleteRecord(id: string, storagePath?: string) {
   // delete from Firestore
   await deleteDoc(doc(db, "records", id));
 
-  // optionally: delete from Storage (if you stored path)
-  // but right now we only saved `fileUrl`, not `path`.
-  // If you want storage delete, store the `path` in uploadRecord().
+  // delete from Storage if we have the path
+  if (storagePath) {
+    const storageRef = ref(storage, storagePath);
+    await deleteObject(storageRef);
+  }
 }

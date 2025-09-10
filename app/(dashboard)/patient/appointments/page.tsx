@@ -69,8 +69,12 @@ export default function PatientAppointmentsPage() {
       setReason("");
       await refreshAppointments();
       setSuccess("Appointment booked successfully! Awaiting confirmation.");
-    } catch (err: any) {
-      setError(err.message || "Failed to book appointment.");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Failed to book appointment.");
+      }
     } finally {
       setLoading(false);
     }

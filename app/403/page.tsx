@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function UnauthorizedPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -6,14 +8,14 @@ export default function UnauthorizedPage() {
           403 - Unauthorized
         </h1>
         <p className="mb-4 text-gray-700">
-          You don U+2019 t have permission to access this page.
+          You don’t have permission to access this page.
         </p>
-        <a
+        <Link
           href="/"
           className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800"
         >
           Go Home
-        </a>
+        </Link>
       </div>
     </div>
   );

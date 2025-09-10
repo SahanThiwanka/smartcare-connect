@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, FormEvent, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   uploadRecord,
@@ -7,6 +7,7 @@ import {
   deleteRecord,
   RecordFile,
 } from "@/lib/records";
+import Image from "next/image";
 
 export default function PatientRecordsPage() {
   const { user } = useAuth();
@@ -15,16 +16,16 @@ export default function PatientRecordsPage() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<RecordFile | null>(null);
 
-  async function loadRecords() {
+  const loadRecords = useCallback(async () => {
     if (!user) return;
     const recs = await getPatientRecords(user.uid);
-    recs.sort((a, b) => b.createdAt - a.createdAt); // newest first
+    recs.sort((a, b) => b.createdAt - a.createdAt);
     setRecords(recs);
-  }
+  }, [user]);
 
   useEffect(() => {
     loadRecords();
-  }, [user]);
+  }, [loadRecords]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -51,10 +52,12 @@ export default function PatientRecordsPage() {
 
     if (["jpg", "jpeg", "png"].includes(ext || "")) {
       return (
-        <img
+        <Image
           src={rec.fileUrl}
           alt={rec.fileName}
-          className="max-h-[70vh] mx-auto"
+          width={800} // adjust to your expected max width
+          height={600} // adjust height proportionally
+          className="max-h-[70vh] mx-auto object-contain"
         />
       );
     }

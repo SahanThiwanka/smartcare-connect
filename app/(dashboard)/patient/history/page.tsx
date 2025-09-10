@@ -4,7 +4,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { getAppointmentsByPatient, Appointment } from "@/lib/appointments";
 import { getPatientRecords, RecordFile } from "@/lib/records";
 import { getDoctorInfo } from "@/lib/doctors";
-const mod = await import("jspdf");
 
 /**
  * Helper: convert possible Timestamp/number/string to millis (number).
@@ -14,15 +13,16 @@ const mod = await import("jspdf");
  *  - Firestore Timestamp object with toMillis()
  *  - undefined/null -> returns 0
  */
-function toMillis(v: any): number {
+type DateLike = number | string | { toMillis: () => number } | null | undefined;
+
+function toMillis(v: DateLike): number {
   if (!v && v !== 0) return 0;
   if (typeof v === "number") return v;
   if (typeof v === "string") {
     const parsed = Date.parse(v);
     return isNaN(parsed) ? 0 : parsed;
   }
-  // Firestore Timestamp
-  if (typeof v === "object" && typeof v.toMillis === "function") {
+  if (typeof v === "object" && v && typeof v.toMillis === "function") {
     try {
       return v.toMillis();
     } catch {
@@ -32,7 +32,7 @@ function toMillis(v: any): number {
   return 0;
 }
 
-function formatDate(v: any) {
+function formatDate(v: DateLike): string {
   const ms = toMillis(v);
   if (!ms) return "-";
   try {
@@ -44,6 +44,7 @@ function formatDate(v: any) {
     return new Date(ms).toString();
   }
 }
+
 
 type AppointmentWithDoctor = Appointment & { doctorName?: string };
 

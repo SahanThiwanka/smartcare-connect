@@ -4,9 +4,22 @@ import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
+interface PatientProfile {
+  fullName?: string;
+  phone?: string;
+  dob?: string;
+  bloodGroup?: string;
+  height?: string;
+  weight?: string;
+  allergies?: string;
+  medications?: string;
+  emergencyContact?: string;
+  address?: string;
+}
+
 export default function PatientProfilePage() {
   const { user } = useAuth();
-  const [form, setForm] = useState<any>(null);
+  const [form, setForm] = useState<PatientProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -19,29 +32,31 @@ export default function PatientProfilePage() {
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
         if (snap.exists()) {
-          setForm(snap.data());
+          setForm(snap.data() as PatientProfile);
         }
-      } catch (err: any) {
+      } catch {
         setError("Failed to load profile.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     fetchData();
   }, [user]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!form) return;
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
   async function handleSave() {
-    if (!user) return;
+    if (!user || !form) return;
     setSaving(true);
     setError(null);
     try {
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, { ...form }); // partial update
       setEdit(false);
-    } catch (err: any) {
+    } catch {
       setError("Failed to update profile.");
     } finally {
       setSaving(false);
@@ -59,76 +74,28 @@ export default function PatientProfilePage() {
 
       {edit ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            name="fullName"
-            value={form.fullName || ""}
-            onChange={handleChange}
-            placeholder="Full Name"
-            className="border p-2 rounded"
-          />
-          <input
-            name="phone"
-            value={form.phone || ""}
-            onChange={handleChange}
-            placeholder="Phone"
-            className="border p-2 rounded"
-          />
-          <input
-            name="dob"
-            type="date"
-            value={form.dob || ""}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
-          <input
-            name="bloodGroup"
-            value={form.bloodGroup || ""}
-            onChange={handleChange}
-            placeholder="Blood Group"
-            className="border p-2 rounded"
-          />
-          <input
-            name="height"
-            value={form.height || ""}
-            onChange={handleChange}
-            placeholder="Height (cm)"
-            className="border p-2 rounded"
-          />
-          <input
-            name="weight"
-            value={form.weight || ""}
-            onChange={handleChange}
-            placeholder="Weight (kg)"
-            className="border p-2 rounded"
-          />
-          <input
-            name="allergies"
-            value={form.allergies || ""}
-            onChange={handleChange}
-            placeholder="Allergies"
-            className="border p-2 rounded"
-          />
-          <input
-            name="medications"
-            value={form.medications || ""}
-            onChange={handleChange}
-            placeholder="Current Medications"
-            className="border p-2 rounded"
-          />
-          <input
-            name="emergencyContact"
-            value={form.emergencyContact || ""}
-            onChange={handleChange}
-            placeholder="Emergency Contact"
-            className="border p-2 rounded"
-          />
-          <input
-            name="address"
-            value={form.address || ""}
-            onChange={handleChange}
-            placeholder="Home Address"
-            className="border p-2 rounded"
-          />
+          {Object.entries({
+            fullName: "Full Name",
+            phone: "Phone",
+            dob: "Date of Birth",
+            bloodGroup: "Blood Group",
+            height: "Height (cm)",
+            weight: "Weight (kg)",
+            allergies: "Allergies",
+            medications: "Current Medications",
+            emergencyContact: "Emergency Contact",
+            address: "Home Address",
+          }).map(([key, placeholder]) => (
+            <input
+              key={key}
+              name={key}
+              type={key === "dob" ? "date" : "text"}
+              value={form[key as keyof PatientProfile] || ""}
+              onChange={handleChange}
+              placeholder={placeholder}
+              className="border p-2 rounded"
+            />
+          ))}
         </div>
       ) : (
         <div className="space-y-2">

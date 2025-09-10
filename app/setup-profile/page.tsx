@@ -1,228 +1,237 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 
+// Common fields for both
+type CommonProfile = {
+  fullName: string;
+  phone: string;
+  gender: string;
+  dob: string;
+};
+
+// Patient-specific
+type PatientProfile = {
+  height: string;
+  weight: string;
+  bloodGroup: string;
+  allergies?: string;
+  medications?: string;
+  emergencyContact?: string;
+};
+
+// Doctor-specific
+type DoctorProfile = {
+  qualification: string;
+  specialty: string;
+  experienceYears?: string;
+  licenseNumber: string;
+  clinicAddress?: string;
+  consultationFee?: string;
+};
+
+// Allow any combination, optional
+type ProfileForm = Partial<CommonProfile & PatientProfile & DoctorProfile>;
+
 export default function SetupProfilePage() {
-  const router = useRouter();
   const { user, role } = useAuth();
+  const router = useRouter();
+
+  const [form, setForm] = useState<ProfileForm>({});
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<any>({});
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!user) return <p className="p-6">Loading...</p>;
-
-  // If admin somehow lands here → skip
-  if (role === "admin") {
-    router.replace("/admin");
-    return null;
-  }
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  // Handle input changes
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-  }
+  };
 
-  async function handleSubmit(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    setError(null);
+  // Validate fields based on step
+  const validateStep = (): boolean => {
+    if (step === 1) {
+      return !!form.fullName && !!form.phone && !!form.gender && !!form.dob;
+    }
+    if (step === 2 && role === "patient") {
+      return !!form.height && !!form.weight && !!form.bloodGroup;
+    }
+    if (step === 2 && role === "doctor") {
+      return !!form.qualification && !!form.specialty && !!form.licenseNumber;
+    }
+    return true;
+  };
 
-    if (!user || !user.uid) {
-      setError("User not found. Please log in again.");
+  // Handle saving profile
+  const handleSubmit = async () => {
+    if (!user) return;
+    if (!validateStep()) {
+      setError("Please fill in all required fields.");
       return;
-    }
-
-    // Basic validation
-    if (!form.fullName || !form.phone || !form.gender || !form.dob) {
-      setError("Please fill out all required fields.");
-      return;
-    }
-
-    if (role === "patient") {
-      if (!form.height || !form.weight || !form.bloodGroup) {
-        setError("Please complete patient details before submitting.");
-        return;
-      }
-    }
-    if (role === "doctor") {
-      if (!form.qualification || !form.specialty || !form.licenseNumber) {
-        setError("Please complete doctor details before submitting.");
-        return;
-      }
     }
 
     try {
       setLoading(true);
+      setError(null);
 
-      // Clean form data
-      const updateData: any = { profileCompleted: true };
+      const updateData: Record<string, unknown> = { profileCompleted: true };
+
       Object.keys(form).forEach((key) => {
-        if (form[key] !== undefined && form[key] !== "") {
-          updateData[key] = form[key];
+        const value = form[key as keyof ProfileForm];
+        if (value !== undefined && value !== "") {
+          updateData[key] = value;
         }
       });
 
       await updateDoc(doc(db, "users", user.uid), updateData);
 
-      // Redirect by role
-      if (role === "patient") {
-        router.replace("/patient/profile");
-      } else if (role === "doctor") {
-        router.replace("/doctor/profile");
-      } else {
-        router.replace("/");
-      }
-    } catch (err: any) {
+      router.push(
+        role === "doctor" ? "/doctor/dashboard" : "/patient/dashboard"
+      );
+    } catch (err: unknown) {
+      console.error(err);
       setError("Failed to save profile. Please try again.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="max-w-lg mx-auto mt-10 bg-white text-black shadow p-6 rounded">
-      <h1 className="text-xl font-semibold mb-4">Complete Your Profile</h1>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="w-full max-w-lg rounded bg-white p-6 shadow">
+        <h1 className="mb-4 text-2xl font-bold">Setup Profile ({role})</h1>
+        {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
 
-      <form onSubmit={handleSubmit}>
-        {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-
-        {/* Step 1: Common fields */}
+        {/* Step 1: Common Fields */}
         {step === 1 && (
-          <>
+          <div className="grid gap-4">
             <input
               name="fullName"
-              placeholder="Full Name *"
-              className="mb-3 w-full border p-2 text-black"
+              placeholder="Full Name"
+              value={form.fullName || ""}
               onChange={handleChange}
+              className="w-full rounded border p-2"
             />
             <input
               name="phone"
-              placeholder="Phone *"
-              className="mb-3 w-full border p-2 text-black"
+              placeholder="Phone"
+              value={form.phone || ""}
               onChange={handleChange}
+              className="w-full rounded border p-2"
             />
-            <input
+            <select
               name="gender"
-              placeholder="Gender *"
-              className="mb-3 w-full border p-2 text-black"
+              value={form.gender || ""}
               onChange={handleChange}
-            />
+              className="w-full rounded border p-2"
+            >
+              <option value="">Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
             <input
               name="dob"
               type="date"
-              className="mb-3 w-full border p-2 text-black"
+              value={form.dob || ""}
               onChange={handleChange}
+              className="w-full rounded border p-2"
             />
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded"
-            >
-              Next
-            </button>
-          </>
+          </div>
         )}
 
-        {/* Step 2: Patient fields */}
+        {/* Step 2: Role-specific */}
         {step === 2 && role === "patient" && (
-          <>
+          <div className="grid gap-4">
             <input
               name="height"
-              placeholder="Height (cm) *"
-              className="mb-3 w-full border p-2 text-black"
+              placeholder="Height"
+              value={form.height || ""}
               onChange={handleChange}
+              className="w-full rounded border p-2"
             />
             <input
               name="weight"
-              placeholder="Weight (kg) *"
-              className="mb-3 w-full border p-2 text-black"
+              placeholder="Weight"
+              value={form.weight || ""}
               onChange={handleChange}
+              className="w-full rounded border p-2"
             />
             <input
               name="bloodGroup"
-              placeholder="Blood Group *"
-              className="mb-3 w-full border p-2 text-black"
+              placeholder="Blood Group"
+              value={form.bloodGroup || ""}
               onChange={handleChange}
+              className="w-full rounded border p-2"
             />
-            <input
-              name="allergies"
-              placeholder="Allergies"
-              className="mb-3 w-full border p-2 text-black"
-              onChange={handleChange}
-            />
-            <input
-              name="medications"
-              placeholder="Current Medications"
-              className="mb-3 w-full border p-2 text-black"
-              onChange={handleChange}
-            />
-            <input
-              name="emergencyContact"
-              placeholder="Emergency Contact"
-              className="mb-3 w-full border p-2 text-black"
-              onChange={handleChange}
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded"
-            >
-              {loading ? "Saving..." : "Finish"}
-            </button>
-          </>
+          </div>
         )}
 
-        {/* Step 2: Doctor fields */}
         {step === 2 && role === "doctor" && (
-          <>
+          <div className="grid gap-4">
             <input
               name="qualification"
-              placeholder="Highest Qualification *"
-              className="mb-3 w-full border p-2 text-black"
+              placeholder="Qualification"
+              value={form.qualification || ""}
               onChange={handleChange}
+              className="w-full rounded border p-2"
             />
             <input
               name="specialty"
-              placeholder="Specialty / Major *"
-              className="mb-3 w-full border p-2 text-black"
+              placeholder="Specialty"
+              value={form.specialty || ""}
               onChange={handleChange}
-            />
-            <input
-              name="experienceYears"
-              placeholder="Years of Experience"
-              className="mb-3 w-full border p-2 text-black"
-              onChange={handleChange}
+              className="w-full rounded border p-2"
             />
             <input
               name="licenseNumber"
-              placeholder="License / Registration Number *"
-              className="mb-3 w-full border p-2 text-black"
+              placeholder="License Number"
+              value={form.licenseNumber || ""}
               onChange={handleChange}
+              className="w-full rounded border p-2"
             />
-            <input
-              name="clinicAddress"
-              placeholder="Clinic / Hospital Address"
-              className="mb-3 w-full border p-2 text-black"
-              onChange={handleChange}
-            />
-            <input
-              name="consultationFee"
-              placeholder="Consultation Fee"
-              className="mb-3 w-full border p-2 text-black"
-              onChange={handleChange}
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded"
-            >
-              {loading ? "Saving..." : "Finish"}
-            </button>
-          </>
+          </div>
         )}
-      </form>
+
+        {/* Navigation buttons */}
+        <div className="mt-6 flex justify-between">
+          {step > 1 && (
+            <button
+              onClick={() => setStep(step - 1)}
+              className="rounded bg-gray-200 px-4 py-2"
+            >
+              Back
+            </button>
+          )}
+          {step < 2 && (
+            <button
+              onClick={() => {
+                if (validateStep()) setStep(step + 1);
+                else
+                  setError(
+                    "Please complete all required fields before continuing."
+                  );
+              }}
+              className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            >
+              Next
+            </button>
+          )}
+          {step === 2 && (
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              {loading ? "Saving..." : "Save"}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
