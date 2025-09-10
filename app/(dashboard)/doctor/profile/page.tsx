@@ -4,9 +4,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
+// 🔹 Define DoctorProfile type
+type DoctorProfile = {
+  fullName?: string;
+  qualification?: string;
+  specialty?: string;
+  licenseNumber?: string;
+  experienceYears?: string;
+  clinicAddress?: string;
+  consultationFee?: string;
+  phone?: string;
+};
+
 export default function DoctorProfilePage() {
   const { user } = useAuth();
-  const [form, setForm] = useState<any>(null);
+  const [form, setForm] = useState<DoctorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState(false);
 
@@ -15,7 +27,7 @@ export default function DoctorProfilePage() {
       if (!user) return;
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()) {
-        setForm(snap.data());
+        setForm(snap.data() as DoctorProfile);
       }
       setLoading(false);
     }
@@ -23,11 +35,12 @@ export default function DoctorProfilePage() {
   }, [user]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!form) return;
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
   async function handleSave() {
-    if (!user) return;
+    if (!user || !form) return;
     const userRef = doc(db, "users", user.uid);
     await updateDoc(userRef, {
       fullName: form.fullName || "",

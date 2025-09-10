@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { getPendingDoctors, approveDoctor } from "@/lib/admin";
+import type { DoctorInfo } from "@/lib/doctors"; // ✅ import correct type
 
 export default function AdminDoctorsPage() {
-  const [pending, setPending] = useState<any[]>([]);
+  const [pending, setPending] = useState<DoctorInfo[]>([]);
   const [loading, setLoading] = useState(false);
 
   const loadPending = async () => {
@@ -27,7 +28,6 @@ export default function AdminDoctorsPage() {
       <h2 className="text-xl font-semibold">Pending Doctors</h2>
 
       {loading && <p>Loading...</p>}
-
       {pending.length === 0 && !loading && <p>No pending doctors.</p>}
 
       {pending.map((doc) => (
@@ -40,7 +40,8 @@ export default function AdminDoctorsPage() {
               <span className="font-semibold">Name:</span> {doc.name}
             </p>
             <p>
-              <span className="font-semibold">Specialty:</span> {doc.specialty}
+              <span className="font-semibold">Specialty:</span>{" "}
+              {doc.specialty}
             </p>
             <p>
               <span className="font-semibold">Email:</span> {doc.email}

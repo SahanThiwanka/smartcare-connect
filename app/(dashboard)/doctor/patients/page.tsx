@@ -5,8 +5,19 @@ import { getAppointmentsByDoctor, Appointment } from "@/lib/appointments";
 import { getPatientInfo } from "@/lib/patients";
 import { getPatientRecords, RecordFile } from "@/lib/records";
 
+type Patient = {
+  uid: string;
+  fullName?: string;
+  email: string;
+  phone?: string;
+  dob?: string;
+  bloodGroup?: string;
+  allergies?: string;
+  medications?: string;
+};
+
 type PatientWithHistory = {
-  patient: any;
+  patient: Patient;
   appointments: Appointment[];
   records: RecordFile[];
 };
@@ -33,7 +44,11 @@ export default function DoctorPatientsPage() {
             const patientApps = apps.filter((a) => a.patientId === pid);
             const recs = await getPatientRecords(pid);
             if (patient) {
-              data.push({ patient, appointments: patientApps, records: recs });
+              data.push({
+                patient: patient as Patient,
+                appointments: patientApps,
+                records: recs,
+              });
             }
           } catch (err) {
             console.error("Error loading patient", pid, err);

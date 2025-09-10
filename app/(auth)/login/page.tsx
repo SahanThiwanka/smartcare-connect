@@ -76,8 +76,12 @@ export default function LoginPage() {
       } else {
         router.push("/");
       }
-    } catch (err: any) {
-      setError(getErrorMessage(err.code || err.message));
+    } catch (err: unknown) {
+      if (err instanceof Error && "code" in err) {
+        setError(getErrorMessage((err as { code: string }).code));
+      } else {
+        setError("An unexpected error occurred.");
+      }
     } finally {
       setLoading(false);
     }
@@ -115,8 +119,12 @@ export default function LoginPage() {
       } else {
         router.push("/");
       }
-    } catch (err: any) {
-      setError(getErrorMessage(err.code || err.message));
+    } catch (err: unknown) {
+      if (err instanceof Error && "code" in err) {
+        setError(getErrorMessage((err as { code: string }).code));
+      } else {
+        setError("An unexpected error occurred.");
+      }
     } finally {
       setLoading(false);
     }
@@ -130,8 +138,12 @@ export default function LoginPage() {
     try {
       await sendEmailVerification(auth.currentUser);
       setInfo("Verification email resent. Please check your inbox.");
-    } catch (err: any) {
-      setError(getErrorMessage(err.code || err.message));
+    } catch (err: unknown) {
+      if (err instanceof Error && "code" in err) {
+        setError(getErrorMessage((err as { code: string }).code));
+      } else {
+        setError("An unexpected error occurred.");
+      }
     }
   }
 

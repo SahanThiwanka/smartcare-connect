@@ -49,7 +49,7 @@ export default function DoctorRegisterPage() {
           uid: res.user.uid,
           email,
           role: "doctor",
-          approved: false, // requires admin approval
+          approved: false,
           verified: false,
           profileCompleted: false,
           createdAt: Date.now(),
@@ -62,8 +62,12 @@ export default function DoctorRegisterPage() {
         );
         router.push("/login");
       }
-    } catch (err: any) {
-      setError(getErrorMessage(err.code || err.message));
+    } catch (err: unknown) {
+      if (err instanceof Error && "code" in err) {
+        setError(getErrorMessage((err as { code: string }).code));
+      } else {
+        setError("An unexpected error occurred.");
+      }
     } finally {
       setLoading(false);
     }
@@ -79,7 +83,6 @@ export default function DoctorRegisterPage() {
       const res = await signInWithPopup(auth, provider);
       const user = res.user;
 
-      // check if doctor account already exists
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()) {
         await auth.signOut();
@@ -90,13 +93,12 @@ export default function DoctorRegisterPage() {
         return;
       }
 
-      // create doctor Firestore record
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
         role: "doctor",
-        approved: false, // must be approved by admin
-        verified: true, // Google is always verified
+        approved: false,
+        verified: true,
         profileCompleted: false,
         createdAt: Date.now(),
       });
@@ -107,8 +109,12 @@ export default function DoctorRegisterPage() {
         "Doctor registration successful with Google! Please wait for admin approval before logging in."
       );
       router.push("/login");
-    } catch (err: any) {
-      setError(getErrorMessage(err.code || err.message));
+    } catch (err: unknown) {
+      if (err instanceof Error && "code" in err) {
+        setError(getErrorMessage((err as { code: string }).code));
+      } else {
+        setError("An unexpected error occurred.");
+      }
     } finally {
       setLoading(false);
     }

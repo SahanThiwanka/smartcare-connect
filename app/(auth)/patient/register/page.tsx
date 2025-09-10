@@ -61,8 +61,12 @@ export default function PatientRegisterPage() {
         );
         router.push("/login");
       }
-    } catch (err: any) {
-      setError(getErrorMessage(err.code || err.message));
+    } catch (err: unknown) {
+      if (err instanceof Error && "code" in err) {
+        setError(getErrorMessage((err as { code: string }).code));
+      } else {
+        setError("An unexpected error occurred.");
+      }
     } finally {
       setLoading(false);
     }
@@ -103,8 +107,12 @@ export default function PatientRegisterPage() {
 
       alert("Patient registration successful with Google! Please login now.");
       router.push("/login");
-    } catch (err: any) {
-      setError(getErrorMessage(err.code || err.message));
+    }  catch (err: unknown) {
+      if (err instanceof Error && "code" in err) {
+        setError(getErrorMessage((err as { code: string }).code));
+      } else {
+        setError("An unexpected error occurred.");
+      }
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getAppointmentsByDoctor,
@@ -8,55 +8,59 @@ import {
   completeAppointment,
   Appointment,
 } from "@/lib/appointments";
-import { getDoctorInfo } from "@/lib/doctors"; // 🔹 we’ll reuse this to fetch patient info
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
-type PatientInfo = {
-  id: string;
+type FirestorePatient = {
   fullName?: string;
   email: string;
   phone?: string;
+};
+
+type PatientInfo = {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
 };
 
 export default function DoctorAppointmentsPage() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
-  const [notes, setNotes] = useState<{ [key: string]: string }>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [patients, setPatients] = useState<Record<string, PatientInfo>>({});
 
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+
     const apps = await getAppointmentsByDoctor(user.uid);
     setAppointments(apps);
 
-    // fetch patient info for each appointment
     const patientData: Record<string, PatientInfo> = {};
     for (const a of apps) {
-      if (!a.patientId) continue;
-      if (!patientData[a.patientId]) {
-        const snap = await getDoc(doc(db, "users", a.patientId));
-        if (snap.exists()) {
-          const d = snap.data() as any;
-          patientData[a.patientId] = {
-            id: snap.id,
-            fullName: d.fullName || "Unknown",
-            email: d.email,
-            phone: d.phone || "-",
-          };
-        }
+      if (!a.patientId || patientData[a.patientId]) continue;
+
+      const snap = await getDoc(doc(db, "users", a.patientId));
+      if (snap.exists()) {
+        const d = snap.data() as FirestorePatient;
+        patientData[a.patientId] = {
+          id: snap.id,
+          fullName: d.fullName ?? "Unknown",
+          email: d.email,
+          phone: d.phone ?? "-",
+        };
       }
     }
-    setPatients(patientData);
 
+    setPatients(patientData);
     setLoading(false);
-  };
+  }, [user]);
 
   useEffect(() => {
     loadAppointments();
-  }, [user]);
+  }, [loadAppointments]);
 
   const updateLocalStatus = (
     id: string,
@@ -107,7 +111,6 @@ export default function DoctorAppointmentsPage() {
       <h2 className="text-2xl font-semibold">Appointments</h2>
 
       {loading && <p>Loading appointments...</p>}
-
       {!loading && appointments.length === 0 && (
         <p>No appointments assigned yet.</p>
       )}
@@ -165,7 +168,10 @@ export default function DoctorAppointmentsPage() {
                     placeholder="Enter notes / diagnosis"
                     value={notes[a.id!] || ""}
                     onChange={(e) =>
-                      setNotes((prev) => ({ ...prev, [a.id!]: e.target.value }))
+                      setNotes((prev) => ({
+                        ...prev,
+                        [a.id!]: e.target.value,
+                      }))
                     }
                   />
                   <button
