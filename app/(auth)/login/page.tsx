@@ -4,12 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   signInWithEmailAndPassword,
-  sendEmailVerification,
   GoogleAuthProvider,
   signInWithPopup,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { FirebaseError } from "firebase/app";
 import { motion } from "framer-motion";
 import { Mail, Lock, Loader2, ShieldCheck, LogIn, Chrome } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
@@ -39,11 +39,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+
     try {
       const res = await signInWithEmailAndPassword(auth, email, password);
+
       if (!res.user.emailVerified) {
         toast.error("Please verify your email before logging in.");
         setLoading(false);
@@ -58,13 +60,20 @@ export default function LoginPage() {
       }
 
       const data = snap.data();
+      if (!data) {
+        toast.error("User data missing. Please contact support.");
+        setLoading(false);
+        return;
+      }
+
       if (!data.profileCompleted) router.push("/setup-profile");
       else if (data.role === "patient") router.push("/patient/profile");
       else if (data.role === "doctor") router.push("/doctor/profile");
       else if (data.role === "admin") router.push("/admin");
       else router.push("/");
-    } catch (err: any) {
-      toast.error(getErrorMessage(err.code));
+    } catch (err: unknown) {
+      const error = err as FirebaseError;
+      toast.error(getErrorMessage(error.code || "unknown"));
     } finally {
       setLoading(false);
     }
@@ -76,6 +85,7 @@ export default function LoginPage() {
       const provider = new GoogleAuthProvider();
       const res = await signInWithPopup(auth, provider);
       const user = res.user;
+
       const snap = await getDoc(doc(db, "users", user.uid));
       if (!snap.exists()) {
         await auth.signOut();
@@ -84,13 +94,19 @@ export default function LoginPage() {
       }
 
       const data = snap.data();
+      if (!data) {
+        toast.error("User data missing. Please contact support.");
+        return;
+      }
+
       if (!data.profileCompleted) router.push("/setup-profile");
       else if (data.role === "patient") router.push("/patient/profile");
       else if (data.role === "doctor") router.push("/doctor/profile");
       else if (data.role === "admin") router.push("/admin");
       else router.push("/");
-    } catch (err: any) {
-      toast.error(getErrorMessage(err.code));
+    } catch (err: unknown) {
+      const error = err as FirebaseError;
+      toast.error(getErrorMessage(error.code || "unknown"));
     } finally {
       setLoading(false);
     }
@@ -138,6 +154,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-md bg-white/20 border border-gray-500 pl-10 pr-3 py-2 placeholder-gray-300 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                required
               />
             </div>
 
@@ -149,6 +166,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-md bg-white/20 border border-gray-500 pl-10 pr-3 py-2 placeholder-gray-300 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                required
               />
             </div>
 

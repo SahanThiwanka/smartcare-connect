@@ -10,6 +10,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { FirebaseError } from "firebase/app";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -43,7 +44,7 @@ export default function PatientRegisterPage() {
   const [loading, setLoading] = useState(false);
 
   // 🔹 Email Registration
-  async function handleRegister(e: React.FormEvent) {
+  async function handleRegister(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
 
@@ -64,8 +65,9 @@ export default function PatientRegisterPage() {
         toast.success("Registration successful! Please verify your email.");
         router.push("/login");
       }
-    } catch (err: any) {
-      toast.error(getErrorMessage(err.code));
+    } catch (err: unknown) {
+      const error = err as FirebaseError;
+      toast.error(getErrorMessage(error.code || "unknown"));
     } finally {
       setLoading(false);
     }
@@ -100,8 +102,9 @@ export default function PatientRegisterPage() {
       await auth.signOut();
       toast.success("Patient registered successfully! Please log in.");
       router.push("/login");
-    } catch (err: any) {
-      toast.error(getErrorMessage(err.code));
+    } catch (err: unknown) {
+      const error = err as FirebaseError;
+      toast.error(getErrorMessage(error.code || "unknown"));
     } finally {
       setLoading(false);
     }

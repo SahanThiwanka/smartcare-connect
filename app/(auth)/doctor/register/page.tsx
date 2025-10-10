@@ -10,6 +10,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { FirebaseError } from "firebase/app";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -43,12 +44,13 @@ export default function DoctorRegisterPage() {
   const [loading, setLoading] = useState(false);
 
   // 🔹 Email Registration
-  async function handleRegister(e: React.FormEvent) {
+  async function handleRegister(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
 
     try {
       const res = await createUserWithEmailAndPassword(auth, email, password);
+
       if (res.user) {
         await sendEmailVerification(res.user);
         await setDoc(doc(db, "users", res.user.uid), {
@@ -65,8 +67,9 @@ export default function DoctorRegisterPage() {
         toast.success("Registration successful! Please verify your email.");
         router.push("/login");
       }
-    } catch (err: any) {
-      toast.error(getErrorMessage(err.code));
+    } catch (err: unknown) {
+      const error = err as FirebaseError;
+      toast.error(getErrorMessage(error.code || "unknown"));
     } finally {
       setLoading(false);
     }
@@ -102,8 +105,9 @@ export default function DoctorRegisterPage() {
       await auth.signOut();
       toast.success("Doctor registered with Google! Await admin approval.");
       router.push("/login");
-    } catch (err: any) {
-      toast.error(getErrorMessage(err.code));
+    } catch (err: unknown) {
+      const error = err as FirebaseError;
+      toast.error(getErrorMessage(error.code || "unknown"));
     } finally {
       setLoading(false);
     }

@@ -24,6 +24,7 @@ import {
   ClipboardList,
   CheckCircle2,
   Clock,
+  LucideIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import CountUp from "react-countup";
@@ -38,19 +39,38 @@ interface AdminStats {
   completedApps: number;
 }
 
+interface AppointmentTrend {
+  month: string;
+  pending: number;
+  approved: number;
+  completed: number;
+}
+
+interface UserGrowthTrend {
+  month: string;
+  doctors: number;
+  patients: number;
+}
+
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [appointmentData, setAppointmentData] = useState<any[]>([]);
-  const [userGrowthData, setUserGrowthData] = useState<any[]>([]);
+  const [appointmentData, setAppointmentData] = useState<AppointmentTrend[]>(
+    []
+  );
+  const [userGrowthData, setUserGrowthData] = useState<UserGrowthTrend[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubStats = subscribeAdminStats((data) => {
+    const unsubStats = subscribeAdminStats((data: AdminStats) => {
       setStats(data);
       setLoading(false);
     });
-    const unsubTrends = subscribeAppointmentTrends(setAppointmentData);
-    const unsubUsers = subscribeUserGrowth(setUserGrowthData);
+    const unsubTrends = subscribeAppointmentTrends((data: AppointmentTrend[]) =>
+      setAppointmentData(data)
+    );
+    const unsubUsers = subscribeUserGrowth((data: UserGrowthTrend[]) =>
+      setUserGrowthData(data)
+    );
     return () => {
       unsubStats();
       unsubTrends();
@@ -66,7 +86,7 @@ export default function AdminDashboardPage() {
   }: {
     title: string;
     value: number;
-    icon: any;
+    icon: LucideIcon;
     color: string;
   }) => (
     <motion.div

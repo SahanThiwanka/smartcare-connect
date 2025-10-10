@@ -3,11 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  getPendingDoctors,
-  approveDoctor,
-  rejectDoctor,
-} from "@/lib/admin";
+import { getPendingDoctors, approveDoctor, rejectDoctor } from "@/lib/admin";
 import type { DoctorInfo } from "@/lib/doctors";
 import { Loader2, Search, Check, X, MailCheck, RefreshCw } from "lucide-react";
 
@@ -29,7 +25,7 @@ export default function AdminDoctorsPage() {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // ——— fetcher ———
-  const loadPending = async (q: string = "") => {
+  const loadPending = async (_: string = "") => {
     setLoading(true);
     setError(null);
     try {
@@ -74,8 +70,7 @@ export default function AdminDoctorsPage() {
       const name = (d.fullName || d.name || "").toLowerCase();
       const email = (d.email || "").toLowerCase();
       const spec = (d.specialty || "").toLowerCase();
-      const qual =
-        (d.qualification || d.qualification || "").toLowerCase();
+      const qual = (d.qualification || d.qualification || "").toLowerCase();
       return (
         name.includes(q) ||
         email.includes(q) ||
@@ -282,9 +277,7 @@ export default function AdminDoctorsPage() {
                                 <span className="text-white/50">
                                   Qualification:
                                 </span>{" "}
-                                {doc.qualification ||
-                                  doc.qualification ||
-                                  "—"}
+                                {doc.qualification || doc.qualification || "—"}
                               </div>
                               <div>
                                 <span className="text-white/50">

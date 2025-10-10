@@ -5,15 +5,47 @@ import {
   query,
   orderBy,
   limit,
+  QuerySnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// ✅ Real-time Admin Stats
-export function subscribeAdminStats(callback: (stats: any) => void) {
+//
+// ─── TYPE DEFINITIONS ───────────────────────────────────────────────
+//
+
+export interface AdminStats {
+  totalPatients: number;
+  totalDoctors: number;
+  approvedDoctors: number;
+  pendingDoctors: number;
+  pendingApps: number;
+  approvedApps: number;
+  completedApps: number;
+}
+
+export interface AppointmentTrend {
+  month: string;
+  pending: number;
+  approved: number;
+  completed: number;
+}
+
+export interface UserGrowthTrend {
+  month: string;
+  doctors: number;
+  patients: number;
+}
+
+//
+// ─── REALTIME ADMIN STATS ──────────────────────────────────────────
+//
+
+export function subscribeAdminStats(callback: (stats: AdminStats) => void) {
   const usersRef = collection(db, "users");
   const appsRef = collection(db, "appointments");
 
-  let currentStats = {
+  let currentStats: AdminStats = {
     totalPatients: 0,
     totalDoctors: 0,
     approvedDoctors: 0,
@@ -25,26 +57,29 @@ export function subscribeAdminStats(callback: (stats: any) => void) {
 
   const update = () => callback({ ...currentStats });
 
-  const unsubUsers = onSnapshot(usersRef, (snap) => {
-    const users = snap.docs.map((d) => d.data());
-    const totalPatients = users.filter((u) => u.role === "patient").length;
-    const totalDoctors = users.filter((u) => u.role === "doctor").length;
-    const approvedDoctors = users.filter(
-      (u) => u.role === "doctor" && u.approved
-    ).length;
-    const pendingDoctors = totalDoctors - approvedDoctors;
+  const unsubUsers = onSnapshot(
+    usersRef,
+    (snap: QuerySnapshot<DocumentData>) => {
+      const users = snap.docs.map((d) => d.data());
+      const totalPatients = users.filter((u) => u.role === "patient").length;
+      const totalDoctors = users.filter((u) => u.role === "doctor").length;
+      const approvedDoctors = users.filter(
+        (u) => u.role === "doctor" && u.approved
+      ).length;
+      const pendingDoctors = totalDoctors - approvedDoctors;
 
-    currentStats = {
-      ...currentStats,
-      totalPatients,
-      totalDoctors,
-      approvedDoctors,
-      pendingDoctors,
-    };
-    update();
-  });
+      currentStats = {
+        ...currentStats,
+        totalPatients,
+        totalDoctors,
+        approvedDoctors,
+        pendingDoctors,
+      };
+      update();
+    }
+  );
 
-  const unsubApps = onSnapshot(appsRef, (snap) => {
+  const unsubApps = onSnapshot(appsRef, (snap: QuerySnapshot<DocumentData>) => {
     const apps = snap.docs.map((d) => d.data());
     const pendingApps = apps.filter((a) => a.status === "pending").length;
     const approvedApps = apps.filter((a) => a.status === "approved").length;
@@ -65,22 +100,27 @@ export function subscribeAdminStats(callback: (stats: any) => void) {
   };
 }
 
-// ✅ Real-time Appointment Trends (for chart)
-export function subscribeAppointmentTrends(callback: (data: any[]) => void) {
+//
+// ─── REALTIME APPOINTMENT TRENDS ───────────────────────────────────
+//
+
+export function subscribeAppointmentTrends(
+  callback: (data: AppointmentTrend[]) => void
+) {
   const q = query(
     collection(db, "appointments"),
     orderBy("createdAt", "asc"),
     limit(1000)
   );
 
-  return onSnapshot(q, (snap) => {
+  return onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
     const raw = snap.docs.map((d) => d.data());
     const monthly: Record<
       string,
       { pending: number; approved: number; completed: number }
     > = {};
 
-    raw.forEach((a: any) => {
+    raw.forEach((a: DocumentData) => {
       if (!a.createdAt) return;
       const month = new Date(a.createdAt).toLocaleString("default", {
         month: "short",
@@ -92,25 +132,32 @@ export function subscribeAppointmentTrends(callback: (data: any[]) => void) {
       if (a.status === "completed") monthly[month].completed++;
     });
 
-    callback(
-      Object.entries(monthly).map(([month, values]) => ({ month, ...values }))
+    const result: AppointmentTrend[] = Object.entries(monthly).map(
+      ([month, values]) => ({ month, ...values })
     );
+
+    callback(result);
   });
 }
 
-// ✅ Real-time User Growth (for chart)
-export function subscribeUserGrowth(callback: (data: any[]) => void) {
+//
+// ─── REALTIME USER GROWTH ──────────────────────────────────────────
+//
+
+export function subscribeUserGrowth(
+  callback: (data: UserGrowthTrend[]) => void
+) {
   const q = query(
     collection(db, "users"),
     orderBy("createdAt", "asc"),
     limit(1000)
   );
 
-  return onSnapshot(q, (snap) => {
+  return onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
     const users = snap.docs.map((d) => d.data());
     const monthly: Record<string, { doctors: number; patients: number }> = {};
 
-    users.forEach((u: any) => {
+    users.forEach((u: DocumentData) => {
       if (!u.createdAt) return;
       const month = new Date(u.createdAt).toLocaleString("default", {
         month: "short",
@@ -120,8 +167,10 @@ export function subscribeUserGrowth(callback: (data: any[]) => void) {
       if (u.role === "patient") monthly[month].patients++;
     });
 
-    callback(
-      Object.entries(monthly).map(([month, values]) => ({ month, ...values }))
+    const result: UserGrowthTrend[] = Object.entries(monthly).map(
+      ([month, values]) => ({ month, ...values })
     );
+
+    callback(result);
   });
 }

@@ -8,9 +8,6 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
 
-// -------- Types --------
-type Role = "patient" | "doctor" | "admin" | undefined;
-
 type ProfileForm = {
   // Common
   fullName?: string;
