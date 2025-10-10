@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { getPendingDoctors, approveDoctor, rejectDoctor } from "@/lib/admin";
 import type { DoctorInfo } from "@/lib/doctors";
+import Image from "next/image";
 
 export default function AdminDoctorsPage() {
   const [pending, setPending] = useState<DoctorInfo[]>([]);
@@ -81,7 +82,7 @@ export default function AdminDoctorsPage() {
           >
             <div className="flex items-center justify-center">
               {doc.photoURL ? (
-                <img
+                <Image
                   src={doc.photoURL}
                   alt={doc.fullName || doc.name}
                   className="w-24 h-24 rounded-full object-cover border"

@@ -20,6 +20,7 @@ export default function ForgotPasswordPage() {
       await sendPasswordResetEmail(auth, email);
       setMessage("Password reset link sent! Please check your email.");
     } catch (err) {
+      console.error("Password reset error:", err);
       setError("Failed to send password reset email. Please try again.");
     } finally {
       setLoading(false);

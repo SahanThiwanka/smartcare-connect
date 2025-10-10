@@ -10,13 +10,15 @@ import {
   deleteDoc,
   orderBy,
   limit,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
 
 export type UserRole = "doctor" | "patient" | "admin";
 
 export type BaseUser = {
-  id: string;            // Firestore doc id (usually uid)
-  uid: string;           // stored uid field
+  id: string; // Firestore doc id (usually uid)
+  uid: string; // stored uid field
   email: string;
   role: UserRole;
   fullName?: string;
@@ -31,11 +33,12 @@ export type BaseUser = {
   clinicAddress?: string;
   consultationFee?: string;
   // Admin controls
-  approved?: boolean;    // doctors
-  blocked?: boolean;     // any user
+  approved?: boolean; // doctors
+  blocked?: boolean; // any user
 };
 
-function mapDoc(d: any): BaseUser {
+// ✅ Strongly typed map function (no "any")
+function mapDoc(d: QueryDocumentSnapshot<DocumentData>): BaseUser {
   const data = d.data() as Partial<BaseUser>;
   return {
     id: d.id,
@@ -99,7 +102,10 @@ export async function approveDoctor(uid: string): Promise<void> {
 }
 
 // Block / Unblock (blocked=true/false)
-export async function setUserBlocked(uid: string, blocked: boolean): Promise<void> {
+export async function setUserBlocked(
+  uid: string,
+  blocked: boolean
+): Promise<void> {
   await updateDoc(doc(db, "users", uid), { blocked });
 }
 

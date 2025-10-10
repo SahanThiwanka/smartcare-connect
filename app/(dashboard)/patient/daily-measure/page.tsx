@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
 import {
@@ -42,9 +42,21 @@ export default function DailyMeasurePage() {
   const [records, setRecords] = useState<DailyMeasure[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // ✅ useCallback fixes missing dependency warning
+  const loadRecords = useCallback(async () => {
+    if (!user) return;
+    const q = query(
+      collection(db, "users", user.uid, "dailyMeasures"),
+      orderBy("date", "desc")
+    );
+    const snap = await getDocs(q);
+    const data = snap.docs.map((d) => d.data() as DailyMeasure);
+    setRecords(data.slice(0, 10)); // show latest 10
+  }, [user]);
+
   useEffect(() => {
     if (user) loadRecords();
-  }, [user]);
+  }, [user, loadRecords]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -69,17 +81,6 @@ export default function DailyMeasurePage() {
     alert("Daily health data saved!");
   }
 
-  async function loadRecords() {
-    if (!user) return;
-    const q = query(
-      collection(db, "users", user.uid, "dailyMeasures"),
-      orderBy("date", "desc")
-    );
-    const snap = await getDocs(q);
-    const data = snap.docs.map((d) => d.data() as DailyMeasure);
-    setRecords(data.slice(0, 10)); // show latest 10
-  }
-
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <h1 className="text-2xl font-bold mb-4">🩺 Daily Health Measurements</h1>
@@ -99,7 +100,8 @@ export default function DailyMeasurePage() {
             key={f.name}
             name={f.name}
             placeholder={f.label}
-            value={(form as any)[f.name] || ""}
+            // ✅ remove "any" by indexing safely
+            value={form[f.name as keyof DailyMeasure] || ""}
             onChange={handleChange}
             className="rounded border p-2 text-white"
           />

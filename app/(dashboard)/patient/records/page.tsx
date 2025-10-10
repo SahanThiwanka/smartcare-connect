@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect, FormEvent, useCallback } from "react";
@@ -11,9 +12,9 @@ import {
 import {
   getAppointmentsByPatient,
   removeAppointmentAttachment,
+  Appointment,
 } from "@/lib/appointments";
 import { getDoctorInfo } from "@/lib/doctors";
-import Image from "next/image";
 
 type DoctorAttachment = {
   fileName: string;
@@ -36,6 +37,25 @@ type PreviewItem = {
   };
 };
 
+type TimestampLike = number | string | { toMillis: () => number };
+
+const toMillis = (v: TimestampLike | null | undefined): number => {
+  if (!v && v !== 0) return 0;
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const t = Date.parse(v);
+    return isNaN(t) ? 0 : t;
+  }
+  if (typeof v === "object" && "toMillis" in v) {
+    try {
+      return v.toMillis();
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+};
+
 export default function PatientRecordsPage() {
   const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
@@ -46,46 +66,23 @@ export default function PatientRecordsPage() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<PreviewItem | null>(null);
 
-  // helper to normalize createdAt -> ms
-  const toMillis = (v: any): number => {
-    if (!v && v !== 0) return 0;
-    if (typeof v === "number") return v;
-    if (typeof v === "string") {
-      const t = Date.parse(v);
-      return isNaN(t) ? 0 : t;
-    }
-    if (typeof v === "object" && typeof v.toMillis === "function") {
-      try {
-        return v.toMillis();
-      } catch {
-        return 0;
-      }
-    }
-    return 0;
-  };
-
   const loadRecords = useCallback(async () => {
     if (!user) return;
-    // 1) load patient uploaded records collection
+
+    // 1) Patient uploaded records
     const recs = await getPatientRecords(user.uid);
     recs.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
     setRecords(recs);
 
-    // 2) load doctor attachments embedded in appointments
-    const apps = await getAppointmentsByPatient(user.uid);
-
+    // 2) Doctor attachments from appointments
+    const apps: Appointment[] = await getAppointmentsByPatient(user.uid);
     const docs: DoctorAttachment[] = [];
 
     for (const a of apps) {
-      if (
-        !Array.isArray((a as any).attachments) ||
-        (a as any).attachments.length === 0
-      ) {
-        continue;
-      }
+      const attachments = a.attachments ?? [];
+      if (!Array.isArray(attachments) || attachments.length === 0) continue;
 
-      // fetch doctor info once per appointment
-      let docName = undefined;
+      let docName: string | undefined;
       try {
         const info = await getDoctorInfo(a.doctorId);
         docName = info?.fullName || info?.name || a.doctorId;
@@ -93,9 +90,9 @@ export default function PatientRecordsPage() {
         docName = a.doctorId;
       }
 
-      for (const att of (a as any).attachments) {
+      for (const att of attachments) {
         docs.push({
-          fileName: att.fileName || att.name || "Attachment",
+          fileName: att.fileName ?? "Attachment",
           fileUrl: att.fileUrl,
           createdAt: att.uploadedAt ?? a.date ?? Date.now(),
           appointmentId: a.id,
@@ -131,14 +128,16 @@ export default function PatientRecordsPage() {
   };
 
   // delete patient record
-  const onDeletePatientRecord = async (r: RecordFile) => {
+  const onDeletePatientRecord = async (
+    r: RecordFile & { storagePath?: string }
+  ) => {
     if (!r.id) return;
     if (!confirm("Delete this record?")) return;
-    await deleteRecord(r.id, (r as any).storagePath);
+    await deleteRecord(r.id, r.storagePath);
     await loadRecords();
   };
 
-  // delete doctor appointment attachment (only if storagePath present)
+  // delete doctor appointment attachment
   const onDeleteDoctorAttachment = async (att: DoctorAttachment) => {
     if (!att.appointmentId) return;
     if (!att.storagePath && !att.fileUrl) {
@@ -154,12 +153,11 @@ export default function PatientRecordsPage() {
     await loadRecords();
   };
 
-  // Preview rendering (pdf/images)
+  // Preview rendering
   const renderPreview = (p: PreviewItem) => {
     const ext = p.fileName.split(".").pop()?.toLowerCase();
     if (["jpg", "jpeg", "png"].includes(ext || "")) {
       return (
-        // next/image requires domain config; using plain <img> to keep preview working everywhere
         <img
           src={p.fileUrl}
           alt={p.fileName}
@@ -252,15 +250,14 @@ export default function PatientRecordsPage() {
                     View
                   </a>
 
-                  {/* Only show delete if we have a storage path (so we can also remove storage object) */}
-                  {d.storagePath ? (
+                  {d.storagePath && (
                     <button
                       onClick={() => onDeleteDoctorAttachment(d)}
                       className="text-red-600 hover:underline"
                     >
                       Delete
                     </button>
-                  ) : null}
+                  )}
                 </div>
               </div>
             ))}
@@ -323,7 +320,7 @@ export default function PatientRecordsPage() {
         )}
       </div>
 
-      {/* Preview modal */}
+      {/* Preview Modal */}
       {preview && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-gray-700 p-4 rounded max-w-3xl w-full relative">

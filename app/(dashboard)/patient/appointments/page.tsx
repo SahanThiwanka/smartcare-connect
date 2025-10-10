@@ -10,6 +10,7 @@ import {
 import { getApprovedDoctors, Doctor } from "@/lib/doctors";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import Image from "next/image";
 
 export default function PatientAppointmentsPage() {
   const { user } = useAuth();
@@ -152,7 +153,7 @@ export default function PatientAppointmentsPage() {
       >
         <div className="flex items-center gap-4">
           {d.photoURL ? (
-            <img
+            <Image
               src={d.photoURL}
               alt={d.name}
               className="w-16 h-16 rounded-full object-cover"
@@ -236,7 +237,7 @@ export default function PatientAppointmentsPage() {
         <div className="p-5 rounded-lg border bg-black text-white space-y-4">
           <div className="flex items-center gap-4">
             {selectedDoctor.photoURL ? (
-              <img
+              <Image
                 src={selectedDoctor.photoURL}
                 alt={selectedDoctor.name}
                 className="w-20 h-20 rounded-full object-cover border border-gray-700"
