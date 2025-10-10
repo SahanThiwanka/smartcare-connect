@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
@@ -9,8 +10,17 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { motion } from "framer-motion";
+import {
+  Mail,
+  Lock,
+  Stethoscope,
+  Loader2,
+  Chrome,
+  UserPlus,
+} from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
 
-// 🔹 Helper: translate Firebase errors to friendly messages
 function getErrorMessage(code: string) {
   switch (code) {
     case "auth/invalid-email":
@@ -30,21 +40,17 @@ export default function DoctorRegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 🔹 Email/Password Registration
+  // 🔹 Email Registration
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setLoading(true);
 
     try {
       const res = await createUserWithEmailAndPassword(auth, email, password);
-
       if (res.user) {
         await sendEmailVerification(res.user);
-
         await setDoc(doc(db, "users", res.user.uid), {
           uid: res.user.uid,
           email,
@@ -56,18 +62,11 @@ export default function DoctorRegisterPage() {
         });
 
         await auth.signOut();
-
-        alert(
-          "Doctor registration successful! Please check your email to verify before logging in."
-        );
+        toast.success("Registration successful! Please verify your email.");
         router.push("/login");
       }
-    } catch (err: unknown) {
-      if (err instanceof Error && "code" in err) {
-        setError(getErrorMessage((err as { code: string }).code));
-      } else {
-        setError("An unexpected error occurred.");
-      }
+    } catch (err: any) {
+      toast.error(getErrorMessage(err.code));
     } finally {
       setLoading(false);
     }
@@ -75,9 +74,7 @@ export default function DoctorRegisterPage() {
 
   // 🔹 Google Registration
   async function handleGoogleRegister() {
-    setError(null);
     setLoading(true);
-
     try {
       const provider = new GoogleAuthProvider();
       const res = await signInWithPopup(auth, provider);
@@ -86,10 +83,9 @@ export default function DoctorRegisterPage() {
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()) {
         await auth.signOut();
-        setError(
-          "This Google account is already registered. Please login instead."
+        toast.error(
+          "This Google account is already registered. Please log in."
         );
-        setLoading(false);
         return;
       }
 
@@ -104,63 +100,111 @@ export default function DoctorRegisterPage() {
       });
 
       await auth.signOut();
-
-      alert(
-        "Doctor registration successful with Google! Please wait for admin approval before logging in."
-      );
+      toast.success("Doctor registered with Google! Await admin approval.");
       router.push("/login");
-    } catch (err: unknown) {
-      if (err instanceof Error && "code" in err) {
-        setError(getErrorMessage((err as { code: string }).code));
-      } else {
-        setError("An unexpected error occurred.");
-      }
+    } catch (err: any) {
+      toast.error(getErrorMessage(err.code));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleRegister} className="p-6 max-w-sm mx-auto">
-      <h2 className="mb-4 text-xl font-semibold">Doctor Registration</h2>
+    <div className="min-h-screen flex bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white">
+      <Toaster position="top-center" />
 
-      <input
-        type="email"
-        placeholder="Email"
-        className="mb-3 block w-full rounded border p-2"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        className="mb-3 block w-full rounded border p-2"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-
-      {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded bg-black px-4 py-2 text-white mb-3"
+      {/* Left Illustration */}
+      <motion.div
+        initial={{ x: -100, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.8 }}
+        className="hidden md:flex flex-1 flex-col items-center justify-center p-12 bg-gradient-to-tr from-teal-700 via-blue-600 to-indigo-700"
       >
-        {loading ? "Registering..." : "Register"}
-      </button>
+        <div className="text-center space-y-6">
+          <Stethoscope className="w-20 h-20 mx-auto text-white" />
+          <h1 className="text-4xl font-bold">Join SmartCare Connect</h1>
+          <p className="text-gray-200 text-lg">
+            Empower patients and connect with care — register as a doctor and
+            start today.
+          </p>
+        </div>
+      </motion.div>
 
-      <div className="flex items-center justify-center my-3">
-        <span className="text-gray-400 text-sm">or</span>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleGoogleRegister}
-        disabled={loading}
-        className="w-full rounded bg-red-500 hover:bg-red-600 px-4 py-2 text-white"
+      {/* Right Form */}
+      <motion.div
+        initial={{ x: 100, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.8 }}
+        className="flex-1 flex items-center justify-center p-8"
       >
-        {loading ? "Registering with Google..." : "Continue with Google"}
-      </button>
-    </form>
+        <div className="w-full max-w-md bg-white/10 backdrop-blur-lg border border-white/20 p-8 rounded-2xl shadow-lg">
+          <h2 className="text-3xl font-semibold text-center mb-6 flex items-center justify-center gap-2">
+            <UserPlus className="w-6 h-6 text-blue-400" /> Doctor Registration
+          </h2>
+
+          <form onSubmit={handleRegister} className="space-y-4">
+            <div className="relative">
+              <Mail className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-md bg-white/20 border border-gray-500 pl-10 pr-3 py-2 placeholder-gray-300 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+
+            <div className="relative">
+              <Lock className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-md bg-white/20 border border-gray-500 pl-10 pr-3 py-2 placeholder-gray-300 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex justify-center items-center gap-2 rounded-md bg-blue-600 hover:bg-blue-700 py-2 transition font-semibold text-white"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" /> Registering...
+                </>
+              ) : (
+                "Register"
+              )}
+            </button>
+
+            <div className="text-center text-gray-400 text-sm mt-2">or</div>
+
+            <button
+              type="button"
+              onClick={handleGoogleRegister}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 py-2 rounded-md hover:bg-gray-100 transition"
+            >
+              <Chrome className="w-5 h-5 text-red-500" />
+              Continue with Google
+            </button>
+
+            <p className="text-center text-gray-400 text-sm mt-4">
+              Already have an account?{" "}
+              <a
+                href="/login"
+                className="text-blue-400 hover:underline font-medium"
+              >
+                Login here
+              </a>
+            </p>
+          </form>
+        </div>
+      </motion.div>
+    </div>
   );
 }

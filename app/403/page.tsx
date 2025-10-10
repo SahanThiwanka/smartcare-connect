@@ -1,22 +1,37 @@
+"use client";
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { ShieldAlert } from "lucide-react";
 
 export default function UnauthorizedPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="rounded border bg-white p-6 shadow text-center">
-        <h1 className="mb-2 text-2xl font-bold text-red-600">
-          403 - Unauthorized
-        </h1>
-        <p className="mb-4 text-gray-700">
-          You don’t have permission to access this page.
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="max-w-md text-center p-8 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md shadow-2xl space-y-6"
+      >
+        <div className="flex justify-center">
+          <ShieldAlert className="w-12 h-12 text-red-500 animate-pulse" />
+        </div>
+
+        <h1 className="text-3xl font-bold text-red-400">403 – Unauthorized</h1>
+
+        <p className="text-gray-300 text-sm leading-relaxed">
+          You don’t have permission to access this page.  
+          Please log in with an authorized account or return to the home page.
         </p>
-        <Link
-          href="/"
-          className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800"
-        >
-          Go Home
-        </Link>
-      </div>
+
+        <div className="pt-4">
+          <Link
+            href="/"
+            className="inline-block rounded-lg bg-blue-500 hover:bg-blue-600 px-5 py-2.5 font-medium text-white transition"
+          >
+            Go Home
+          </Link>
+        </div>
+      </motion.div>
     </div>
   );
 }
