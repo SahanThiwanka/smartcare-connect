@@ -5,14 +5,7 @@ import { getAppointmentsByPatient, Appointment } from "@/lib/appointments";
 import { getPatientRecords, RecordFile } from "@/lib/records";
 import { getDoctorInfo } from "@/lib/doctors";
 
-/**
- * Helper: convert possible Timestamp/number/string to millis (number).
- * Accepts:
- *  - number (ms)
- *  - ISO string
- *  - Firestore Timestamp object with toMillis()
- *  - undefined/null -> returns 0
- */
+// ------------------- Helpers -------------------
 type DateLike = number | string | { toMillis: () => number } | null | undefined;
 
 function toMillis(v: DateLike): number {
@@ -45,8 +38,10 @@ function formatDate(v: DateLike): string {
   }
 }
 
+// ------------------- Types -------------------
 type AppointmentWithDoctor = Appointment & { doctorName?: string };
 
+// ------------------- Component -------------------
 export default function PatientHistoryPage() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<AppointmentWithDoctor[]>([]);
@@ -58,10 +53,10 @@ export default function PatientHistoryPage() {
     (async () => {
       setLoading(true);
       try {
-        // 1. Load appointments
+        // 1️⃣ Load all patient appointments
         const apps = await getAppointmentsByPatient(user.uid);
 
-        // attach doctor info (name fallback)
+        // 2️⃣ Attach doctor info (name fallback)
         const withDocs = await Promise.all(
           apps.map(async (a) => {
             try {
@@ -75,16 +70,13 @@ export default function PatientHistoryPage() {
           })
         );
 
-        // sort newest first (by appointment date)
-        // sort newest first (by appointment date)
+        // sort by most recent date
         withDocs.sort(
           (a, b) => toMillis(b.date as DateLike) - toMillis(a.date as DateLike)
         );
 
-        // 2. Load records
+        // 3️⃣ Load uploaded patient records
         const recs = await getPatientRecords(user.uid);
-
-        // sort newest first (by createdAt)
         recs.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
 
         setAppointments(withDocs);
@@ -97,92 +89,12 @@ export default function PatientHistoryPage() {
     })();
   }, [user]);
 
-  // Compose printable HTML for the PDF / print window
-  function buildPrintableHtml() {
-    const title = `Medical History - ${user?.email ?? ""}`;
-    const style = `
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; color: #111 }
-        h1 { font-size: 18px; margin-bottom: 8px }
-        h2 { font-size: 14px; margin-top: 16px; margin-bottom: 8px }
-        .section { margin-bottom: 12px }
-        .item { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #eee }
-        .meta { color: #555; font-size: 12px }
-        table { width: 100%; border-collapse: collapse }
-        th, td { border: 1px solid #ddd; padding: 6px; font-size: 12px }
-      </style>
-    `;
-
-    const apptsHtml =
-      appointments.length === 0
-        ? `<p>No appointments.</p>`
-        : `<table>
-            <thead><tr><th>Date</th><th>Doctor</th><th>Reason</th><th>Status</th></tr></thead>
-            <tbody>
-              ${appointments
-                .map(
-                  (a) => `
-                <tr>
-                  <td>${formatDate(a.date)}</td>
-                  <td>${a.doctorName ?? a.doctorId}</td>
-                  <td>${(a.reason || "").replaceAll("\n", "<br/>")}</td>
-                  <td>${a.status}</td>
-                </tr>
-              `
-                )
-                .join("")}
-            </tbody>
-          </table>`;
-
-    const recsHtml =
-      records.length === 0
-        ? `<p>No records uploaded.</p>`
-        : `<ul>
-            ${records
-              .map(
-                (r) => `
-              <li class="item">
-                <div><strong>${r.fileName}</strong></div>
-                <div class="meta">${formatDate(r.createdAt)} • <a href="${
-                  r.fileUrl
-                }" target="_blank">Open</a></div>
-              </li>
-            `
-              )
-              .join("")}
-          </ul>`;
-
-    return `<!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8"/>
-          <title>${title}</title>
-          ${style}
-        </head>
-        <body>
-          <h1>${title}</h1>
-          <div class="section">
-            <h2>Appointments</h2>
-            ${apptsHtml}
-          </div>
-          <div class="section">
-            <h2>Uploaded Records</h2>
-            ${recsHtml}
-          </div>
-        </body>
-      </html>`;
-  }
-
-  // Try to use jsPDF if available (optional). If not installed, fallback to print window.
+  // ------------------- PDF / Print -------------------
   async function downloadPdfReport() {
-    // first try jsPDF (if user installed it)
     try {
-      // dynamic import; works only if jspdf is installed in the project
       const mod = await import("jspdf");
       const { jsPDF } = mod;
       const doc = new jsPDF();
-
-      // Simple text-based PDF output (keeps dependency usage minimal)
       doc.setFontSize(14);
       doc.text(`Medical History - ${user?.email ?? ""}`, 10, 14);
       doc.setFontSize(10);
@@ -191,18 +103,20 @@ export default function PatientHistoryPage() {
       doc.text("Appointments:", 10, y);
       y += 6;
       for (const a of appointments) {
-        const line = `${formatDate(a.date)} | ${a.doctorName || a.doctorId} | ${
-          a.status
-        }`;
+        const line = `${formatDate(a.date)} | ${a.doctorName} | ${a.status}`;
         doc.text(line, 10, y);
         y += 6;
         const reasonLines = (a.reason || "").split("\n");
         for (const rl of reasonLines) {
           doc.text(`  ${rl}`, 12, y);
           y += 6;
-          if (y > 280) {
-            doc.addPage();
-            y = 20;
+        }
+        if (a.attachments && a.attachments.length > 0) {
+          doc.text("  Attachments:", 12, y);
+          y += 6;
+          for (const att of a.attachments) {
+            doc.text(`   - ${att.fileName}`, 14, y);
+            y += 6;
           }
         }
         if (y > 270) {
@@ -215,105 +129,100 @@ export default function PatientHistoryPage() {
       doc.text("Records:", 10, y);
       y += 6;
       for (const r of records) {
-        const line = `${r.fileName} • ${formatDate(r.createdAt)}`;
-        doc.text(line, 10, y);
+        doc.text(`${r.fileName} • ${formatDate(r.createdAt)}`, 10, y);
         y += 6;
-        if (y > 280) {
-          doc.addPage();
-          y = 20;
-        }
       }
 
       doc.save("medical-history.pdf");
-      return;
     } catch (err) {
-      // jsPDF not installed or failed — fallback to print-to-PDF
-      console.info("jsPDF not available, falling back to print window.", err);
+      alert("PDF generation failed, please try again.");
+      console.error(err);
     }
-
-    const html = buildPrintableHtml();
-    const w = window.open("", "_blank", "noopener,noreferrer");
-    if (!w) {
-      alert("Unable to open new window. Please allow popups to download PDF.");
-      return;
-    }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-
-    // Wait a tick for the content to render, then call print
-    w.focus();
-    // call print, user can save as PDF
-    setTimeout(() => {
-      try {
-        w.print();
-      } catch (e) {
-        console.warn("Print failed:", e);
-      }
-    }, 500);
   }
 
+  // ------------------- Render -------------------
   return (
     <div className="max-w-4xl mx-auto grid gap-8 p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">My Medical History</h2>
-        <div>
-          <button
-            onClick={downloadPdfReport}
-            className="rounded bg-black text-white px-4 py-2"
-          >
-            Download PDF Report
-          </button>
-        </div>
+        <button
+          onClick={downloadPdfReport}
+          className="rounded bg-black text-white px-4 py-2"
+        >
+          Download PDF Report
+        </button>
       </div>
 
       {loading && <p>Loading...</p>}
 
-      {/* Appointment History */}
+      {/* 🩺 Appointment History */}
       <div>
         <h3 className="text-lg font-semibold mb-3">Appointments</h3>
         {appointments.length === 0 && <p>No appointments yet.</p>}
         <div className="grid gap-3">
           {appointments.map((a) => (
-            <div key={a.id} className="rounded border p-3">
+            <div key={a.id} className="rounded border p-3 bg-black text-white">
               <p>
-                <span className="font-semibold">Doctor:</span> {a.doctorName}
+                <b>Doctor:</b> {a.doctorName}
               </p>
               <p>
-                <span className="font-semibold">Date:</span>{" "}
-                {formatDate(a.date)}
+                <b>Date:</b> {formatDate(a.date)}
               </p>
               <p>
-                <span className="font-semibold">Reason:</span> {a.reason}
+                <b>Reason:</b> {a.reason}
               </p>
               <p>
-                <span className="font-semibold">Status:</span>{" "}
+                <b>Status:</b>{" "}
                 <span
                   className={`px-2 py-0.5 rounded text-sm ${
                     a.status === "completed"
-                      ? "bg-green-100 text-green-700"
+                      ? "bg-green-700 text-white"
                       : a.status === "pending"
-                      ? "bg-yellow-100 text-yellow-700"
+                      ? "bg-yellow-600 text-black"
                       : a.status === "declined"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-blue-100 text-blue-700"
+                      ? "bg-red-600 text-white"
+                      : "bg-blue-600 text-white"
                   }`}
                 >
                   {a.status}
                 </span>
               </p>
+
+              {/* ✅ Show doctor notes */}
               {a.status === "completed" && a.notes && (
-                <p className="mt-2 p-2 rounded bg-gray-600 text-sm">
-                  <span className="font-semibold">Doctor’s Notes:</span>{" "}
-                  {a.notes}
+                <p className="mt-2 p-2 rounded bg-gray-700 text-sm">
+                  <b>Doctor’s Notes:</b> {a.notes}
                 </p>
               )}
+
+              {/* ✅ Show doctor-uploaded files */}
+              {a.status === "completed" &&
+                a.attachments &&
+                a.attachments.length > 0 && (
+                  <div className="mt-3 p-2 border rounded bg-gray-800 text-sm">
+                    <b>Doctor Attachments:</b>
+                    <ul className="list-disc pl-6 mt-1">
+                      {a.attachments.map((file) => (
+                        <li key={file.fileUrl}>
+                          <a
+                            href={file.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:underline"
+                          >
+                            {file.fileName}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Health Records */}
+      {/* 📂 Health Records */}
       <div>
         <h3 className="text-lg font-semibold mb-3">Uploaded Records</h3>
         {records.length === 0 && <p>No records uploaded yet.</p>}
@@ -321,17 +230,17 @@ export default function PatientHistoryPage() {
           {records.map((r) => (
             <div
               key={r.id}
-              className="flex justify-between items-center border rounded p-2"
+              className="flex justify-between items-center border rounded p-2 bg-gray-700 text-white"
             >
               <a
                 href={r.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
+                className="text-blue-400 hover:underline"
               >
                 {r.fileName}
               </a>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-gray-300">
                 {formatDate(r.createdAt)}
               </span>
             </div>

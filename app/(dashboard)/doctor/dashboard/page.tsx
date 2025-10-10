@@ -2,19 +2,51 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { getAppointmentsByDoctor, Appointment } from "@/lib/appointments";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import Link from "next/link";
+
+interface AppointmentWithPatient extends Appointment {
+  patientName?: string;
+}
 
 export default function DoctorDashboardPage() {
   const { user } = useAuth();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentWithPatient[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
 
+  // 🔹 Helper to fetch patient name
+  const getPatientName = async (uid: string): Promise<string> => {
+    try {
+      const snap = await getDoc(doc(db, "users", uid));
+      if (snap.exists()) {
+        const data = snap.data() as { fullName?: string; name?: string };
+        return data.fullName || data.name || uid;
+      }
+    } catch {
+      return uid;
+    }
+    return uid;
+  };
+
+  // 🔹 Load appointments + attach patient names
   useEffect(() => {
     if (!user) return;
+
     (async () => {
       setLoading(true);
       const apps = await getAppointmentsByDoctor(user.uid);
-      setAppointments(apps);
+
+      const withNames = await Promise.all(
+        apps.map(async (a) => ({
+          ...a,
+          patientName: await getPatientName(a.patientId),
+        }))
+      );
+
+      setAppointments(withNames);
       setLoading(false);
     })();
   }, [user]);
@@ -62,11 +94,11 @@ export default function DoctorDashboardPage() {
             {todaysAppointments.map((a) => (
               <div
                 key={a.id}
-                className="p-3 border rounded bg-gray-50 flex justify-between"
+                className="p-3 border rounded bg-gray-50 flex justify-between text-black"
               >
                 <div>
                   <p>
-                    <b>Patient ID:</b> {a.patientId}
+                    <b>Patient:</b> {a.patientName || "Unknown"}
                   </p>
                   <p>
                     <b>Reason:</b> {a.reason}
@@ -75,7 +107,7 @@ export default function DoctorDashboardPage() {
                     <b>Status:</b> {a.status}
                   </p>
                 </div>
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-gray-500 pl-4">
                   {new Date(a.date).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",

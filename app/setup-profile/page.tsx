@@ -7,11 +7,11 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 
 type ProfileForm = {
-  // common
   fullName?: string;
   phone?: string;
   gender?: string;
   dob?: string;
+  maritalStatus?: string;
 
   // patient
   height?: string;
@@ -19,8 +19,13 @@ type ProfileForm = {
   bloodGroup?: string;
   allergies?: string;
   medications?: string;
-  emergencyContact?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   address?: string;
+  chronicConditions?: string[];
+  otherCondition?: string;
+  pastSurgeries?: string;
+  languages?: string[];
 
   // doctor
   qualification?: string;
@@ -30,6 +35,21 @@ type ProfileForm = {
   clinicAddress?: string;
   consultationFee?: string;
 };
+
+const chronicList = [
+  "Cardiovascular diseases",
+  "Diabetes",
+  "Cancers",
+  "Chronic respiratory diseases",
+  "Neurological conditions",
+  "Mental health disorders",
+  "Arthritis",
+  "Chronic kidney disease",
+  "Obesity",
+  "STD",
+];
+
+const languageList = ["English", "Tamil", "Sinhala"];
 
 export default function SetupProfilePage() {
   const { user, role } = useAuth();
@@ -44,6 +64,17 @@ export default function SetupProfilePage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleCheckboxChange = (field: string, value: string) => {
+    setForm((prev) => {
+      const current = new Set(
+        (prev[field as keyof ProfileForm] as string[]) || []
+      );
+      if (current.has(value)) current.delete(value);
+      else current.add(value);
+      return { ...prev, [field]: Array.from(current) };
+    });
   };
 
   const validateStep = (): boolean => {
@@ -70,13 +101,13 @@ export default function SetupProfilePage() {
       setLoading(true);
       setError(null);
 
-      // Build update object with ALL expected keys (so none are missing later)
       const base = {
         profileCompleted: true,
         fullName: form.fullName ?? "",
         phone: form.phone ?? "",
         gender: form.gender ?? "",
         dob: form.dob ?? "",
+        maritalStatus: form.maritalStatus ?? "",
       };
 
       let updateData: Record<string, unknown> = { ...base };
@@ -89,8 +120,13 @@ export default function SetupProfilePage() {
           bloodGroup: form.bloodGroup ?? "",
           allergies: form.allergies ?? "",
           medications: form.medications ?? "",
-          emergencyContact: form.emergencyContact ?? "",
+          emergencyContactName: form.emergencyContactName ?? "",
+          emergencyContactPhone: form.emergencyContactPhone ?? "",
           address: form.address ?? "",
+          chronicConditions: form.chronicConditions ?? [],
+          otherCondition: form.otherCondition ?? "",
+          pastSurgeries: form.pastSurgeries ?? "",
+          languages: form.languages ?? [],
         };
       } else if (role === "doctor") {
         updateData = {
@@ -106,7 +142,6 @@ export default function SetupProfilePage() {
 
       await updateDoc(doc(db, "users", user.uid), updateData);
 
-      // go to profile (profile pages fetch fresh data)
       router.push(role === "doctor" ? "/doctor/profile" : "/patient/profile");
     } catch (err) {
       console.error("Failed to save profile:", err);
@@ -117,15 +152,15 @@ export default function SetupProfilePage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center ">
-      <div className="w-full max-w-lg rounded bg-black p-6 shadow">
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="w-full max-w-lg rounded bg-black p-6 shadow text-white">
         <h1 className="mb-4 text-2xl font-bold">
           Setup Profile ({role ?? "—"})
         </h1>
 
-        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
 
-        {/* Step 1 */}
+        {/* Step 1 - Common */}
         {step === 1 && (
           <div className="grid gap-4">
             <input
@@ -133,37 +168,48 @@ export default function SetupProfilePage() {
               placeholder="Full Name"
               value={form.fullName ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
             <input
               name="phone"
               placeholder="Phone"
               value={form.phone ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
             <select
               name="gender"
               value={form.gender ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2 bg-black"
+              className="w-full rounded border p-2 text-white bg-black"
             >
               <option value="">Select Gender</option>
               <option value="male">Male</option>
               <option value="female">Female</option>
               <option value="other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+            <select
+              name="maritalStatus"
+              value={form.maritalStatus ?? ""}
+              onChange={handleChange}
+              className="w-full rounded border p-2 text-white bg-black"
+            >
+              <option value="">Marital Status</option>
+              <option value="Married">Married</option>
+              <option value="Unmarried">Unmarried</option>
             </select>
             <input
               name="dob"
               type="date"
               value={form.dob ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
           </div>
         )}
 
-        {/* Step 2 - patient */}
+        {/* Step 2 - Patient */}
         {step === 2 && role === "patient" && (
           <div className="grid gap-4">
             <input
@@ -171,54 +217,104 @@ export default function SetupProfilePage() {
               placeholder="Height (cm)"
               value={form.height ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
             <input
               name="weight"
               placeholder="Weight (kg)"
               value={form.weight ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
-            <input
+            <select
               name="bloodGroup"
-              placeholder="Blood Group"
               value={form.bloodGroup ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
-            />
+              className="w-full rounded border p-2 text-white bg-black"
+            >
+              <option value="">Select Blood Group</option>
+              {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+
+            <label className="font-semibold mt-2">
+              Chronic Medical Conditions:
+            </label>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {chronicList.map((c) => (
+                <label key={c} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.chronicConditions?.includes(c) || false}
+                    onChange={() =>
+                      handleCheckboxChange("chronicConditions", c)
+                    }
+                  />
+                  {c}
+                </label>
+              ))}
+            </div>
             <input
-              name="allergies"
-              placeholder="Allergies"
-              value={form.allergies ?? ""}
+              name="otherCondition"
+              placeholder="Other (specify)"
+              value={form.otherCondition ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
+
             <input
-              name="medications"
-              placeholder="Current Medications"
-              value={form.medications ?? ""}
+              name="pastSurgeries"
+              placeholder="Past Surgeries (if any)"
+              value={form.pastSurgeries ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
-            <input
-              name="emergencyContact"
-              placeholder="Emergency Contact"
-              value={form.emergencyContact ?? ""}
-              onChange={handleChange}
-              className="w-full rounded border p-2"
-            />
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                name="emergencyContactName"
+                placeholder="Emergency Contact Name"
+                value={form.emergencyContactName ?? ""}
+                onChange={handleChange}
+                className="rounded border p-2 text-white"
+              />
+              <input
+                name="emergencyContactPhone"
+                placeholder="Emergency Contact Phone"
+                value={form.emergencyContactPhone ?? ""}
+                onChange={handleChange}
+                className="rounded border p-2 text-white"
+              />
+            </div>
+
             <input
               name="address"
               placeholder="Home Address"
               value={form.address ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
+
+            <label className="font-semibold mt-2">Languages Spoken:</label>
+            <div className="flex gap-3">
+              {languageList.map((l) => (
+                <label key={l} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.languages?.includes(l) || false}
+                    onChange={() => handleCheckboxChange("languages", l)}
+                  />
+                  {l}
+                </label>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Step 2 - doctor */}
+        {/* Step 2 - Doctor */}
         {step === 2 && role === "doctor" && (
           <div className="grid gap-4">
             <input
@@ -226,47 +322,47 @@ export default function SetupProfilePage() {
               placeholder="Highest Qualification"
               value={form.qualification ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
             <input
               name="specialty"
               placeholder="Specialty / Major"
               value={form.specialty ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
             <input
               name="licenseNumber"
               placeholder="License / Registration Number"
               value={form.licenseNumber ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
             <input
               name="experienceYears"
               placeholder="Years of Experience"
               value={form.experienceYears ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
             <input
               name="clinicAddress"
               placeholder="Clinic / Hospital Address"
               value={form.clinicAddress ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
             <input
               name="consultationFee"
               placeholder="Consultation Fee"
               value={form.consultationFee ?? ""}
               onChange={handleChange}
-              className="w-full rounded border p-2"
+              className="w-full rounded border p-2 text-white"
             />
           </div>
         )}
 
-        {/* navigation */}
+        {/* Navigation */}
         <div className="mt-6 flex justify-between">
           {step > 1 && (
             <button

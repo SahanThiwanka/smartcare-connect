@@ -26,6 +26,7 @@ export default function Navbar() {
                   <>
                     <Link href="/patient/dashboard">Dashboard</Link>
                     <Link href="/patient/profile">Profile</Link>
+                    <Link href="/patient/daily-measure">Daily-measure</Link>
                     <Link href="/patient/appointments">Appointments</Link>
                     <Link href="/patient/records">Records</Link>
                     <Link href="/patient/history">History</Link>
@@ -57,6 +58,7 @@ export default function Navbar() {
               <>
                 <Link href="/admin">Dashboard</Link>
                 <Link href="/admin/doctors">Approve Doctors</Link>
+                <Link href="/admin/users">User Management</Link>
               </>
             )}
 

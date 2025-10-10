@@ -11,19 +11,38 @@ import {
 
 //
 // ==== Types ====
+
 export type Doctor = {
   uid: string;
   name: string;
+  fullName?: string;
   specialty: string;
+  qualification?: string;
+  experienceYears?: string;
+  licenseNumber?: string;
+  clinicAddress?: string;
+  consultationFee?: string;
+  phone?: string;
+  email?: string;
+  photoURL?: string;
+  approved?: boolean;
+  role?: string;
 };
 
 export type DoctorInfo = {
   id: string;
   uid: string;
-  name: string;       // 👈 keep short name
-  fullName: string;   // 👈 keep full name
+  name: string;
+  fullName: string;
   email: string;
+  phone?: string;
   specialty: string;
+  qualification?: string;
+  experienceYears?: string;
+  licenseNumber?: string;
+  clinicAddress?: string;
+  consultationFee?: string;
+  photoURL?: string;
   approved: boolean;
 };
 
@@ -32,22 +51,33 @@ export type Appointment = {
   doctorId: string;
   patientId: string;
   date: string;
-  // add other fields if needed
+  status?: string;
+  notes?: string;
+  attachments?: { fileName: string; fileUrl: string }[];
 };
 
-// Firestore schema for doctors (raw document shape)
+// Firestore schema (raw)
 type DoctorDoc = {
   uid: string;
   name?: string;
   fullName?: string;
   specialty?: string;
+  qualification?: string;
+  experienceYears?: string;
+  licenseNumber?: string;
+  clinicAddress?: string;
+  consultationFee?: string;
+  phone?: string;
   email?: string;
+  photoURL?: string;
   approved?: boolean;
   role?: string;
 };
 
 //
 // ==== Firestore Queries ====
+
+/** ✅ Get all approved doctors (for search/listing, favorites, etc.) */
 export async function getApprovedDoctors(): Promise<Doctor[]> {
   const q = query(
     collection(db, "users"),
@@ -59,15 +89,27 @@ export async function getApprovedDoctors(): Promise<Doctor[]> {
   return snap.docs.map((docSnap) => {
     const data = docSnap.data() as DoctorDoc;
     return {
-      uid: data.uid,
+      uid: data.uid || docSnap.id,
       name: data.name ?? data.fullName ?? "Unknown Doctor",
+      fullName: data.fullName ?? data.name ?? "",
       specialty: data.specialty ?? "General",
+      qualification: data.qualification ?? "",
+      experienceYears: data.experienceYears ?? "",
+      licenseNumber: data.licenseNumber ?? "",
+      clinicAddress: data.clinicAddress ?? "",
+      consultationFee: data.consultationFee ?? "",
+      phone: data.phone ?? "",
+      email: data.email ?? "",
+      photoURL: data.photoURL ?? "",
+      approved: data.approved ?? false,
+      role: data.role ?? "doctor",
     };
   });
 }
 
+/** ✅ Get full info for one doctor (safe + complete) */
 export async function getDoctorInfo(uid: string): Promise<DoctorInfo | null> {
-  if (!uid) return null; // 👈 prevent invalid call
+  if (!uid) return null;
 
   const snap = await getDoc(doc(db, "users", uid));
   if (!snap.exists()) return null;
@@ -75,17 +117,23 @@ export async function getDoctorInfo(uid: string): Promise<DoctorInfo | null> {
   const data = snap.data() as DoctorDoc;
   return {
     id: snap.id,
-    uid: data.uid,
-    name: data.name ?? "Unknown",          // fallback if missing
+    uid: data.uid || snap.id,
+    name: data.name ?? "Unknown",
     fullName: data.fullName ?? data.name ?? "Unknown Doctor",
     email: data.email ?? "",
+    phone: data.phone ?? "",
     specialty: data.specialty ?? "General",
+    qualification: data.qualification ?? "",
+    experienceYears: data.experienceYears ?? "",
+    licenseNumber: data.licenseNumber ?? "",
+    clinicAddress: data.clinicAddress ?? "",
+    consultationFee: data.consultationFee ?? "",
+    photoURL: data.photoURL ?? "",
     approved: data.approved ?? false,
   };
 }
 
-//
-// ==== Example usage with appointments ====
+/** ✅ Attach doctor names to appointment list for display */
 export async function attachDoctorNames(
   apps: Appointment[]
 ): Promise<(Appointment & { doctorName: string })[]> {
@@ -93,8 +141,7 @@ export async function attachDoctorNames(
     apps.map(async (a: Appointment) => {
       try {
         const docInfo = await getDoctorInfo(a.doctorId);
-        const doctorName =
-          docInfo?.fullName || docInfo?.name || a.doctorId;
+        const doctorName = docInfo?.fullName || docInfo?.name || a.doctorId;
 
         return { ...a, doctorName };
       } catch {
