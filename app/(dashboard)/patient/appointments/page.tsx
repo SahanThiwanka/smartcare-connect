@@ -34,7 +34,10 @@ export default function PatientAppointmentsPage() {
 
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()) {
-        const data = snap.data() as any;
+        type UserDoc = {
+          favorites?: string[];
+        };
+        const data = snap.data() as UserDoc;
         setFavorites(data.favorites || []);
       }
     })();
