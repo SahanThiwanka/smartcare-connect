@@ -1,28 +1,80 @@
+// app/(dashboard)/patient/profile/page.tsx
 "use client";
+
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  User,
+  Syringe,
+  ShieldAlert,
+  Languages,
+  Save,
+  X,
+  Pencil,
+  Activity,
+  Hospital,
+  FileHeart,
+  HeartPulse,
+  Ruler,
+  Droplet,
+  Stethoscope,
+} from "lucide-react";
 
-interface PatientProfile {
+type PatientProfile = {
   fullName?: string;
   phone?: string;
   dob?: string;
   gender?: string;
   maritalStatus?: string;
+
+  // vitals
   bloodGroup?: string;
-  height?: string;
-  weight?: string;
+  height?: string; // cm
+  weight?: string; // kg
+
+  // medical
   allergies?: string;
   medications?: string;
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
-  address?: string;
   chronicConditions?: string[];
   otherCondition?: string;
   pastSurgeries?: string;
+
+  // contact
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  address?: string;
+
+  // misc
   languages?: string[];
-}
+};
+
+const CHRONIC_LIST = [
+  "Cardiovascular diseases",
+  "Diabetes",
+  "Cancers",
+  "Chronic respiratory diseases",
+  "Neurological conditions",
+  "Mental health disorders",
+  "Arthritis",
+  "Chronic kidney disease",
+  "Obesity",
+  "STD",
+] as const;
+
+const LANGUAGE_LIST = ["English", "Tamil", "Sinhala"] as const;
+const BLOOD_GROUPS = [
+  "A+",
+  "A-",
+  "B+",
+  "B-",
+  "AB+",
+  "AB-",
+  "O+",
+  "O-",
+] as const;
 
 export default function PatientProfilePage() {
   const { user } = useAuth();
@@ -31,49 +83,82 @@ export default function PatientProfilePage() {
   const [edit, setEdit] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
-  // Fetch profile
+  // fetch once
   useEffect(() => {
-    async function fetchData() {
-      if (!user) return;
+    if (!user?.uid) return;
+    let mounted = true;
+
+    (async () => {
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
+        if (!mounted) return;
+
+        const base: PatientProfile = {
+          fullName: "",
+          phone: "",
+          dob: "",
+          gender: "",
+          maritalStatus: "",
+          bloodGroup: "",
+          height: "",
+          weight: "",
+          allergies: "",
+          medications: "",
+          chronicConditions: [],
+          otherCondition: "",
+          pastSurgeries: "",
+          emergencyContactName: "",
+          emergencyContactPhone: "",
+          address: "",
+          languages: [],
+        };
+
         if (snap.exists()) {
-          setForm(snap.data() as PatientProfile);
+          setForm({ ...base, ...(snap.data() as PatientProfile) });
+        } else {
+          setForm(base);
         }
       } catch {
         setError("Failed to load profile.");
       } finally {
         setLoading(false);
       }
-    }
-    fetchData();
-  }, [user]);
+    })();
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    return () => {
+      mounted = false;
+    };
+  }, [user?.uid]);
+
+  const setField =
+    (name: keyof PatientProfile) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      setForm((prev) => (prev ? { ...prev, [name]: e.target.value } : prev));
+    };
+
+  const toggleChip = (
+    field: "chronicConditions" | "languages",
+    value: string
   ) => {
-    if (!form) return;
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleCheckboxChange = (field: string, value: string) => {
-    if (!form) return;
-    const current = new Set(
-      (form[field as keyof PatientProfile] as string[]) || []
-    );
-    if (current.has(value)) current.delete(value);
-    else current.add(value);
-    setForm({ ...form, [field]: Array.from(current) });
+    setForm((prev) => {
+      if (!prev) return prev;
+      const set = new Set(prev[field] ?? []);
+      set.has(value) ? set.delete(value) : set.add(value);
+      return { ...prev, [field]: Array.from(set) };
+    });
   };
 
   const handleSave = async () => {
-    if (!user || !form) return;
+    if (!user?.uid || !form) return;
     setSaving(true);
     setError(null);
+    setInfo(null);
     try {
-      await updateDoc(doc(db, "users", user.uid), { ...form });
+      await updateDoc(doc(db, "users", user.uid), form);
       setEdit(false);
+      setInfo("Profile updated successfully.");
     } catch {
       setError("Failed to update profile.");
     } finally {
@@ -81,276 +166,451 @@ export default function PatientProfilePage() {
     }
   };
 
-  if (loading) return <p className="p-6">Loading...</p>;
-  if (!form) return <p className="p-6">No profile found.</p>;
+  const empty = (v?: string) => (v && v.trim() ? v : "—");
+
+  // BMI helper
+  const bmi = (() => {
+    const h = Number(form?.height || "");
+    const w = Number(form?.weight || "");
+    if (!h || !w) return null;
+    const meters = h / 100;
+    if (!meters) return null;
+    const b = w / (meters * meters);
+    return isFinite(b) ? b : null;
+  })();
+
+  const glass =
+    "rounded-2xl border border-white/10 bg-white/5 shadow-lg backdrop-blur-md";
+  const inputBase =
+    "w-full rounded-lg bg-white/10 border border-white/15 px-3 py-2 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-sky-500";
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] grid place-items-center text-white/70">
+        Loading profile...
+      </div>
+    );
+  }
+  if (!form) {
+    return (
+      <div className="min-h-[60vh] grid place-items-center text-white/70">
+        No profile found.
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-black text-white rounded shadow">
-      <h1 className="text-2xl font-bold mb-6">My Profile</h1>
-
-      {error && <p className="text-red-400 mb-4">{error}</p>}
-
-      {edit ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Basic Info */}
-          <input
-            name="fullName"
-            placeholder="Full Name"
-            value={form.fullName || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-          <input
-            name="phone"
-            placeholder="Phone"
-            value={form.phone || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-          <select
-            name="gender"
-            value={form.gender || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white bg-black"
-          >
-            <option value="">Select Gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-            <option value="Prefer not to say">Prefer not to say</option>
-          </select>
-          <select
-            name="maritalStatus"
-            value={form.maritalStatus || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white bg-black"
-          >
-            <option value="">Marital Status</option>
-            <option value="Married">Married</option>
-            <option value="Unmarried">Unmarried</option>
-          </select>
-          <input
-            name="dob"
-            type="date"
-            value={form.dob || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-
-          {/* Medical Info */}
-          <input
-            name="height"
-            placeholder="Height (cm)"
-            value={form.height || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-          <input
-            name="weight"
-            placeholder="Weight (kg)"
-            value={form.weight || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-          <select
-            name="bloodGroup"
-            value={form.bloodGroup || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white bg-black"
-          >
-            <option value="">Select Blood Group</option>
-            {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-
-          <input
-            name="allergies"
-            placeholder="Allergies"
-            value={form.allergies || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-          <input
-            name="medications"
-            placeholder="Medications"
-            value={form.medications || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-
-          {/* Emergency Contact */}
-          <input
-            name="emergencyContactName"
-            placeholder="Emergency Contact Name"
-            value={form.emergencyContactName || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-          <input
-            name="emergencyContactPhone"
-            placeholder="Emergency Contact Phone"
-            value={form.emergencyContactPhone || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-
-          {/* Address */}
-          <input
-            name="address"
-            placeholder="Home Address"
-            value={form.address || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white"
-          />
-
-          {/* Chronic Medical Conditions */}
-          <div className="col-span-2">
-            <label className="font-semibold">Chronic Conditions</label>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {[
-                "Cardiovascular diseases",
-                "Diabetes",
-                "Cancers",
-                "Chronic respiratory diseases",
-                "Neurological conditions",
-                "Mental health disorders",
-                "Arthritis",
-                "Chronic kidney disease",
-                "Obesity",
-                "STD",
-              ].map((c) => (
-                <label key={c} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={form.chronicConditions?.includes(c) || false}
-                    onChange={() =>
-                      handleCheckboxChange("chronicConditions", c)
-                    }
-                  />
-                  {c}
-                </label>
-              ))}
-            </div>
-            <input
-              name="otherCondition"
-              placeholder="Other (specify)"
-              value={form.otherCondition || ""}
-              onChange={handleChange}
-              className="border p-2 rounded text-white mt-2"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white py-10 px-6">
+      <div className="mx-auto w-full max-w-6xl space-y-8">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <HeartPulse className="h-6 w-6 text-sky-300" />
+              My Profile
+            </h1>
+            <p className="text-white/70">Manage your personal & medical info</p>
           </div>
+          <div className="flex gap-2">
+            {!edit ? (
+              <button
+                onClick={() => setEdit(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 hover:bg-white/20"
+              >
+                <Pencil className="h-4 w-4" /> Edit
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-black hover:bg-emerald-400 disabled:opacity-50"
+                >
+                  <Save className="h-4 w-4" />
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={() => setEdit(false)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 hover:bg-white/20"
+                >
+                  <X className="h-4 w-4" /> Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </motion.div>
 
-          {/* Past Surgeries */}
-          <input
-            name="pastSurgeries"
-            placeholder="Past Surgeries (if any)"
-            value={form.pastSurgeries || ""}
-            onChange={handleChange}
-            className="border p-2 rounded text-white col-span-2"
-          />
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200"
+            >
+              {error}
+            </motion.div>
+          )}
+          {info && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200"
+            >
+              {info}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Sections */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Basic */}
+          <Section title="Basic Information" icon={User}>
+            {edit ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <LabeledInput
+                  label="Full Name"
+                  value={form.fullName ?? ""}
+                  onChange={setField("fullName")}
+                />
+                <LabeledInput
+                  label="Phone"
+                  value={form.phone ?? ""}
+                  onChange={setField("phone")}
+                />
+                <LabeledInput
+                  label="Date of Birth"
+                  type="date"
+                  value={form.dob ?? ""}
+                  onChange={setField("dob")}
+                />
+                <LabeledSelect
+                  label="Gender"
+                  value={form.gender ?? ""}
+                  onChange={setField("gender")}
+                  options={["male", "female", "other"]}
+                />
+                <LabeledSelect
+                  label="Marital Status"
+                  value={form.maritalStatus ?? ""}
+                  onChange={setField("maritalStatus")}
+                  options={["Married", "Unmarried"]}
+                />
+              </div>
+            ) : (
+              <ReadRows
+                rows={[
+                  ["Full Name", empty(form.fullName)],
+                  ["Phone", empty(form.phone)],
+                  ["Date of Birth", empty(form.dob)],
+                  ["Gender", empty(form.gender)],
+                  ["Marital Status", empty(form.maritalStatus)],
+                ]}
+              />
+            )}
+          </Section>
+
+          {/* Vitals */}
+          <Section title="Vitals" icon={Stethoscope}>
+            {edit ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <LabeledSelect
+                  label="Blood Group"
+                  value={form.bloodGroup ?? ""}
+                  onChange={setField("bloodGroup")}
+                  options={[...BLOOD_GROUPS]}
+                />
+                <LabeledInput
+                  label="Height (cm)"
+                  value={form.height ?? ""}
+                  onChange={setField("height")}
+                  icon={<Ruler className="h-4 w-4 text-sky-300" />}
+                />
+                <LabeledInput
+                  label="Weight (kg)"
+                  value={form.weight ?? ""}
+                  onChange={setField("weight")}
+                  icon={<Droplet className="h-4 w-4 text-sky-300" />}
+                />
+              </div>
+            ) : (
+              <ReadRows
+                rows={[
+                  ["Blood Group", empty(form.bloodGroup)],
+                  ["Height", form.height ? `${form.height} cm` : "—"],
+                  ["Weight", form.weight ? `${form.weight} kg` : "—"],
+                  ["BMI (calc.)", bmi ? bmi.toFixed(1) : "—"],
+                ]}
+              />
+            )}
+          </Section>
+
+          {/* Medical */}
+          <Section title="Medical Information" icon={Syringe}>
+            {edit ? (
+              <div className="grid gap-4">
+                <LabeledInput
+                  label="Allergies"
+                  value={form.allergies ?? ""}
+                  onChange={setField("allergies")}
+                />
+                <LabeledInput
+                  label="Medications"
+                  value={form.medications ?? ""}
+                  onChange={setField("medications")}
+                />
+                <div>
+                  <div className="text-sm text-white/70 mb-2">
+                    Chronic Conditions
+                  </div>
+                  <Chips
+                    options={CHRONIC_LIST}
+                    selected={form.chronicConditions ?? []}
+                    onToggle={(v) => toggleChip("chronicConditions", v)}
+                  />
+                </div>
+                <LabeledInput
+                  label="Other Condition (specify)"
+                  value={form.otherCondition ?? ""}
+                  onChange={setField("otherCondition")}
+                />
+              </div>
+            ) : (
+              <ReadRows
+                rows={[
+                  ["Allergies", empty(form.allergies)],
+                  ["Medications", empty(form.medications)],
+                  [
+                    "Chronic Conditions",
+                    form.chronicConditions?.length
+                      ? form.chronicConditions.join(", ")
+                      : "—",
+                  ],
+                  ["Other Condition", empty(form.otherCondition)],
+                ]}
+              />
+            )}
+          </Section>
+
+          {/* Surgical History */}
+          <Section title="Surgical History" icon={HeartPulse}>
+            {edit ? (
+              <LabeledInput
+                label="Past Surgeries (if any)"
+                value={form.pastSurgeries ?? ""}
+                onChange={setField("pastSurgeries")}
+              />
+            ) : (
+              <ReadRows
+                rows={[["Past Surgeries", empty(form.pastSurgeries)]]}
+              />
+            )}
+          </Section>
+
+          {/* Emergency & Address */}
+          <Section title="Emergency & Address" icon={ShieldAlert}>
+            {edit ? (
+              <div className="grid gap-4">
+                <LabeledInput
+                  label="Emergency Contact Name"
+                  value={form.emergencyContactName ?? ""}
+                  onChange={setField("emergencyContactName")}
+                />
+                <LabeledInput
+                  label="Emergency Contact Phone"
+                  value={form.emergencyContactPhone ?? ""}
+                  onChange={setField("emergencyContactPhone")}
+                />
+                <LabeledInput
+                  label="Home Address"
+                  value={form.address ?? ""}
+                  onChange={setField("address")}
+                />
+              </div>
+            ) : (
+              <ReadRows
+                rows={[
+                  [
+                    "Emergency Contact",
+                    form.emergencyContactName
+                      ? `${form.emergencyContactName} (${
+                          form.emergencyContactPhone || "—"
+                        })`
+                      : "—",
+                  ],
+                  ["Address", empty(form.address)],
+                ]}
+              />
+            )}
+          </Section>
 
           {/* Languages */}
-          <div className="col-span-2">
-            <label className="font-semibold">Languages Spoken</label>
-            <div className="flex gap-3">
-              {["English", "Tamil", "Sinhala"].map((l) => (
-                <label key={l} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={form.languages?.includes(l) || false}
-                    onChange={() => handleCheckboxChange("languages", l)}
-                  />
-                  {l}
-                </label>
-              ))}
-            </div>
-          </div>
+          <Section title="Languages" icon={Languages}>
+            {edit ? (
+              <Chips
+                options={LANGUAGE_LIST}
+                selected={form.languages ?? []}
+                onToggle={(v) => toggleChip("languages", v)}
+              />
+            ) : (
+              <ReadRows
+                rows={[["Languages Spoken", form.languages?.join(", ") || "—"]]}
+              />
+            )}
+          </Section>
         </div>
-      ) : (
-        <div className="space-y-2">
-          <p>
-            <b>Name:</b> {form.fullName || "-"}
-          </p>
-          <p>
-            <b>Phone:</b> {form.phone || "-"}
-          </p>
-          <p>
-            <b>DOB:</b> {form.dob || "-"}
-          </p>
-          <p>
-            <b>Gender:</b> {form.gender || "-"}
-          </p>
-          <p>
-            <b>Marital Status:</b> {form.maritalStatus || "-"}
-          </p>
-          <p>
-            <b>Blood Group:</b> {form.bloodGroup || "-"}
-          </p>
-          <p>
-            <b>Height:</b> {form.height || "-"} cm
-          </p>
-          <p>
-            <b>Weight:</b> {form.weight || "-"} kg
-          </p>
-          <p>
-            <b>Allergies:</b> {form.allergies || "-"}
-          </p>
-          <p>
-            <b>Medications:</b> {form.medications || "-"}
-          </p>
-          <p>
-            <b>Emergency Contact:</b> {form.emergencyContactName || "-"} (
-            {form.emergencyContactPhone || "-"})
-          </p>
-          <p>
-            <b>Address:</b> {form.address || "-"}
-          </p>
-          <p>
-            <b>Chronic Conditions:</b>{" "}
-            {form.chronicConditions?.join(", ") || "-"}
-          </p>
-          <p>
-            <b>Other Conditions:</b> {form.otherCondition || "-"}
-          </p>
-          <p>
-            <b>Past Surgeries:</b> {form.pastSurgeries || "-"}
-          </p>
-          <p>
-            <b>Languages:</b> {form.languages?.join(", ") || "-"}
-          </p>
-        </div>
-      )}
 
-      {/* Buttons */}
-      <div className="mt-6 flex gap-3">
-        {edit ? (
-          <>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-green-600 px-4 py-2 rounded text-white"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button
-              onClick={() => setEdit(false)}
-              className="bg-gray-600 px-4 py-2 rounded text-white"
-            >
-              Cancel
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={() => setEdit(true)}
-            className="bg-blue-600 px-4 py-2 rounded text-white"
-          >
-            Edit Profile
-          </button>
-        )}
+        {/* Footer info */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`${glass} p-4 text-sm text-white/70`}
+        >
+          <div className="flex flex-wrap items-center gap-4">
+            <Activity className="h-4 w-4 text-sky-300" /> Smooth local editing
+            (no focus loss)
+            <Hospital className="h-4 w-4 text-sky-300" /> Secure Firestore
+            update
+            <FileHeart className="h-4 w-4 text-sky-300" /> Dark glass UI with
+            sections
+          </div>
+        </motion.div>
       </div>
+    </div>
+  );
+}
+
+/* ---------- Reusable UI ---------- */
+
+function Section({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-white/10 bg-white/5 shadow-lg backdrop-blur-md p-5"
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <Icon className="h-5 w-5 text-sky-300" />
+        <h3 className="text-lg font-semibold">{title}</h3>
+      </div>
+      {children}
+    </motion.div>
+  );
+}
+
+function ReadRows({ rows }: { rows: [string, string][] }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {rows.map(([label, value]) => (
+        <div key={label} className="rounded-lg bg-white/5 p-3">
+          <div className="text-xs text-white/60">{label}</div>
+          <div className="text-sm">{value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Chips({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: readonly string[];
+  selected: string[];
+  onToggle: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => {
+        const active = selected.includes(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onToggle(opt)}
+            className={`rounded-full px-3 py-1 text-sm transition ${
+              active
+                ? "bg-sky-400 text-black hover:bg-sky-300"
+                : "bg-white/10 text-white/80 hover:bg-white/20"
+            }`}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LabeledInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  icon,
+}: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: "text" | "date";
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-2 text-sm text-white/70">
+        {icon} {label}
+      </div>
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        className="w-full rounded-lg bg-white/10 border border-white/15 px-3 py-2 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-sky-500"
+        placeholder={label}
+      />
+    </div>
+  );
+}
+
+function LabeledSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: string[];
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-sm text-white/70">{label}</div>
+      <select
+        value={value}
+        onChange={onChange}
+        className="w-full rounded-lg bg-white/10 border border-white/15 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+      >
+        <option value="">Select</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

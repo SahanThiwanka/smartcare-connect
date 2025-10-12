@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
 import {
@@ -41,8 +42,21 @@ export default function DailyMeasurePage() {
   });
   const [records, setRecords] = useState<DailyMeasure[]>([]);
   const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  // ✅ useCallback fixes missing dependency warning
+  const inputFields = useMemo(
+    () => [
+      { name: "pressure", label: "Blood Pressure (mmHg)" },
+      { name: "cholesterol", label: "Cholesterol (mg/dL)" },
+      { name: "sugar", label: "Sugar (mg/dL)" },
+      { name: "spo2", label: "SpO₂ (%)" },
+      { name: "exerciseTime", label: "Exercise Time (mins)" },
+      { name: "temperature", label: "Temperature (°C)" },
+      { name: "weight", label: "Weight (kg)" },
+    ],
+    []
+  );
+
   const loadRecords = useCallback(async () => {
     if (!user) return;
     const q = query(
@@ -51,160 +65,165 @@ export default function DailyMeasurePage() {
     );
     const snap = await getDocs(q);
     const data = snap.docs.map((d) => d.data() as DailyMeasure);
-    setRecords(data.slice(0, 10)); // show latest 10
+    setRecords(data.slice(0, 10));
   }, [user]);
 
   useEffect(() => {
     if (user) loadRecords();
   }, [user, loadRecords]);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  }
+  };
 
-  async function handleSave() {
+  const handleSave = async () => {
     if (!user) return;
     setLoading(true);
-    const ref = doc(
-      db,
-      "users",
-      user.uid,
-      "dailyMeasures",
-      form.date || new Date().toISOString().split("T")[0]
-    );
-    await setDoc(ref, {
-      ...form,
-      createdAt: Timestamp.now(),
-    });
-    await loadRecords();
-    setLoading(false);
-    alert("Daily health data saved!");
-  }
+    setMsg(null);
+    try {
+      const ref = doc(
+        db,
+        "users",
+        user.uid,
+        "dailyMeasures",
+        form.date || new Date().toISOString().split("T")[0]
+      );
+      await setDoc(ref, {
+        ...form,
+        createdAt: Timestamp.now(),
+      });
+      await loadRecords();
+      setMsg("✅ Saved successfully!");
+    } catch (err) {
+      console.error(err);
+      setMsg("❌ Failed to save, please try again.");
+    } finally {
+      setLoading(false);
+      setTimeout(() => setMsg(null), 4000);
+    }
+  };
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-8">
-      <h1 className="text-2xl font-bold mb-4">🩺 Daily Health Measurements</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 text-white py-10 px-5">
+      <div className="max-w-5xl mx-auto space-y-8">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-3xl font-bold">🩺 Daily Health Measurements</h1>
+          <p className="text-white/70 mt-1">
+            Track your daily vitals and visualize health trends.
+          </p>
+        </motion.div>
 
-      {/* Form */}
-      <div className="grid gap-4 md:grid-cols-3 bg-black p-4 rounded text-white">
-        {[
-          { name: "pressure", label: "Blood Pressure (mmHg)" },
-          { name: "cholesterol", label: "Cholesterol (mg/dL)" },
-          { name: "sugar", label: "Sugar (mg/dL)" },
-          { name: "spo2", label: "SpO₂ (%)" },
-          { name: "exerciseTime", label: "Exercise Time (mins)" },
-          { name: "temperature", label: "Temperature (°C)" },
-          { name: "weight", label: "Weight (kg)" },
-        ].map((f) => (
-          <input
-            key={f.name}
-            name={f.name}
-            placeholder={f.label}
-            // ✅ remove "any" by indexing safely
-            value={form[f.name as keyof DailyMeasure] || ""}
-            onChange={handleChange}
-            className="rounded border p-2 text-white"
-          />
-        ))}
+        {/* Form Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-lg p-6"
+        >
+          <div className="grid gap-4 md:grid-cols-3">
+            {inputFields.map((f) => (
+              <input
+                key={f.name}
+                name={f.name}
+                placeholder={f.label}
+                value={form[f.name as keyof DailyMeasure] || ""}
+                onChange={handleChange}
+                className="rounded-xl border border-white/10 bg-black/40 p-2 focus:ring-2 focus:ring-green-400/50"
+              />
+            ))}
 
-        <input
-          type="date"
-          name="date"
-          value={form.date}
-          onChange={handleChange}
-          className="rounded border p-2 text-white"
-        />
-      </div>
-
-      <button
-        onClick={handleSave}
-        disabled={loading}
-        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-      >
-        {loading ? "Saving..." : "Save Measurement"}
-      </button>
-
-      {/* Chart Section */}
-      {records.length > 0 && (
-        <div className="space-y-8 mt-8">
-          <h2 className="text-xl font-semibold">📊 Health Trends</h2>
-
-          {/* Blood Pressure Chart */}
-          <div className="bg-white p-4 rounded shadow text-black">
-            <h3 className="font-medium mb-2">Blood Pressure</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={records.slice().reverse()}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="pressure"
-                  stroke="#1E90FF"
-                  name="Pressure"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <input
+              type="date"
+              name="date"
+              value={form.date}
+              onChange={handleChange}
+              className="rounded-xl border border-white/10 bg-black/40 p-2 focus:ring-2 focus:ring-green-400/50"
+            />
           </div>
 
-          {/* Blood Sugar Chart */}
-          <div className="bg-white p-4 rounded shadow text-black">
-            <h3 className="font-medium mb-2">Blood Sugar</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={records.slice().reverse()}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="sugar"
-                  stroke="#FF6347"
-                  name="Sugar"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Weight Chart */}
-          <div className="bg-white p-4 rounded shadow text-black">
-            <h3 className="font-medium mb-2">Weight</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={records.slice().reverse()}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="weight"
-                  stroke="#32CD32"
-                  name="Weight"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Recent Records */}
-      <div className="mt-10">
-        <h2 className="text-xl font-semibold mb-3">🗓 Recent Records</h2>
-        <div className="grid gap-3">
-          {records.map((r) => (
-            <div
-              key={r.date}
-              className="border rounded p-3 bg-gray-700 shadow-sm text-sm"
+          <div className="mt-4 flex items-center gap-4">
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold"
             >
-              <b>{r.date}</b> — Pressure: {r.pressure || "-"}, Sugar:{" "}
-              {r.sugar || "-"}, Weight: {r.weight || "-"}kg
-            </div>
-          ))}
-        </div>
+              {loading ? "Saving..." : "Save Measurement"}
+            </button>
+
+            {msg && (
+              <span
+                className={`text-sm ${
+                  msg.startsWith("✅") ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                {msg}
+              </span>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Charts */}
+        {records.length > 0 && (
+          <div className="space-y-8">
+            <h2 className="text-xl font-semibold">📊 Health Trends</h2>
+
+            {[
+              { key: "pressure", label: "Blood Pressure", color: "#60A5FA" },
+              { key: "sugar", label: "Blood Sugar", color: "#FB7185" },
+              { key: "weight", label: "Weight", color: "#34D399" },
+            ].map((chart) => (
+              <motion.div
+                key={chart.key}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-lg p-4"
+              >
+                <h3 className="font-medium mb-2 text-white/90">
+                  {chart.label}
+                </h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={records.slice().reverse()}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                    <XAxis dataKey="date" stroke="#aaa" />
+                    <YAxis stroke="#aaa" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#222",
+                        border: "1px solid #555",
+                        color: "white",
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey={chart.key}
+                      stroke={chart.color}
+                      name={chart.label}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
+        {/* Recent Records */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <h2 className="text-xl font-semibold mb-3">🗓 Recent Records</h2>
+          <div className="grid gap-3">
+            {records.map((r) => (
+              <div
+                key={r.date}
+                className="rounded-xl border border-white/10 bg-black/30 backdrop-blur-sm p-3 text-sm hover:bg-white/5 transition"
+              >
+                <b>{r.date}</b> — Pressure: {r.pressure || "-"}, Sugar:{" "}
+                {r.sugar || "-"}, Weight: {r.weight || "-"}kg
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </div>
     </div>
   );
