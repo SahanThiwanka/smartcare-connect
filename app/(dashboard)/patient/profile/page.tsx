@@ -145,7 +145,11 @@ export default function PatientProfilePage() {
     setForm((prev) => {
       if (!prev) return prev;
       const set = new Set(prev[field] ?? []);
-      set.has(value) ? set.delete(value) : set.add(value);
+      if (set.has(value)) {
+        set.delete(value);
+      } else {
+        set.add(value);
+      }
       return { ...prev, [field]: Array.from(set) };
     });
   };
@@ -181,8 +185,6 @@ export default function PatientProfilePage() {
 
   const glass =
     "rounded-2xl border border-white/10 bg-white/5 shadow-lg backdrop-blur-md";
-  const inputBase =
-    "w-full rounded-lg bg-white/10 border border-white/15 px-3 py-2 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-sky-500";
 
   if (loading) {
     return (

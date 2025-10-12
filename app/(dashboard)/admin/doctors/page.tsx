@@ -25,7 +25,7 @@ export default function AdminDoctorsPage() {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // ——— fetcher ———
-  const loadPending = async (_: string = "") => {
+  const loadPending = async (_query: string = "") => {
     setLoading(true);
     setError(null);
     try {

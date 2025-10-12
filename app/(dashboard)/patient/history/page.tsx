@@ -24,13 +24,21 @@ function toMillis(v: DateLike): number {
     const parsed = Date.parse(v);
     return isNaN(parsed) ? 0 : parsed;
   }
-  if (typeof v === "object" && v && typeof (v as any).toMillis === "function") {
+
+  // type guard for objects that have a toMillis method
+  if (
+    typeof v === "object" &&
+    v !== null &&
+    "toMillis" in v &&
+    typeof (v as { toMillis: () => number }).toMillis === "function"
+  ) {
     try {
-      return (v as any).toMillis();
+      return (v as { toMillis: () => number }).toMillis();
     } catch {
       return 0;
     }
   }
+
   return 0;
 }
 
