@@ -12,6 +12,7 @@ import {
 import { db, storage } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import Link from "next/link";
 
 // ---------------- Types ----------------
 type FirestorePatient = {
@@ -249,7 +250,7 @@ export default function DoctorAppointmentsPage() {
           <div>
             <h2 className="text-3xl font-bold">Appointments</h2>
             <p className="text-white/60 text-sm">
-              Approve, decline, and complete with notes & attachments.
+              Approve, decline, complete with notes & attachments — or open the AI tools.
             </p>
           </div>
 
@@ -366,7 +367,8 @@ export default function DoctorAppointmentsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 space-y-4">
+                  {/* Primary actions (Pending) */}
                   {a.status === "pending" && (
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -396,6 +398,7 @@ export default function DoctorAppointmentsPage() {
                     </div>
                   )}
 
+                  {/* Completion (Approved) */}
                   {a.status === "approved" && (
                     <div className="space-y-2">
                       <textarea
@@ -429,6 +432,16 @@ export default function DoctorAppointmentsPage() {
                       </button>
                     </div>
                   )}
+
+                  {/* Open AI Tools */}
+                  <div>
+                    <Link
+                      href={`/doctor/appointments/${a.id}`}
+                      className="inline-block rounded bg-white text-black px-3 py-2 hover:bg-gray-200"
+                    >
+                      Open / AI Tools →
+                    </Link>
+                  </div>
                 </div>
               </section>
             );

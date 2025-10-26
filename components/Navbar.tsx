@@ -49,6 +49,7 @@ export default function Navbar() {
                       </NavLink>
                       <NavLink href="/patient/records">Records</NavLink>
                       <NavLink href="/patient/history">History</NavLink>
+                      <NavLink href="/patient/copilot">Copilot</NavLink>
                     </>
                   )}
                 </>
@@ -139,6 +140,7 @@ export default function Navbar() {
                         <Link href="/patient/appointments">Appointments</Link>
                         <Link href="/patient/records">Records</Link>
                         <Link href="/patient/history">History</Link>
+                         <Link href="/patient/copilot">Copilot</Link>
                       </>
                     )}
                   </>
