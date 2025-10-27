@@ -1,3 +1,4 @@
+// app/(dashboard)/patient/appointments/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
@@ -7,7 +8,7 @@ import {
   approveAppointment,
   declineAppointment,
   completeAppointment,
-  Appointment,
+  type Appointment,
 } from "@/lib/appointments";
 import { db, storage } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";

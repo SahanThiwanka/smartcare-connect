@@ -1,3 +1,4 @@
+// app/(dashboard)/patient/daily-measure/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -35,22 +36,22 @@ type DailyMeasure = {
   date: string;
 
   // Legacy/raw strings (back-compat)
-  pressure?: string;         // e.g. "120/80"
-  cholesterol?: string;      // total
-  sugar?: string;            // fasting
-  sugarPost?: string;        // 2h post meal (optional)
+  pressure?: string; // e.g. "120/80"
+  cholesterol?: string; // total
+  sugar?: string; // fasting
+  sugarPost?: string; // 2h post meal (optional)
   spo2?: string;
   exerciseTime?: string;
   temperature?: string;
-  weight?: string;           // kg
-  height?: string;           // cm
-  waterIntake?: string;      // L per day
+  weight?: string; // kg
+  height?: string; // cm
+  waterIntake?: string; // L per day
 
   // Numeric, preferred
   systolic?: number;
   diastolic?: number;
-  sugarMgDl?: number;        // fasting
-  sugarPostMgDl?: number;    // 2h post
+  sugarMgDl?: number; // fasting
+  sugarPostMgDl?: number; // 2h post
   cholesterolTotal?: number;
   spo2Pct?: number;
   exerciseMins?: number;
@@ -59,10 +60,11 @@ type DailyMeasure = {
   heightCm?: number;
   waterIntakeL?: number;
 
-  createdAt?: any;
+  createdAt?: Timestamp;
 };
 
 type Status = "Good" | "OK" | "Bad" | "Emergency";
+type Risk = Status | "Unknown";
 
 function todayISO(): string {
   const d = new Date();
@@ -72,7 +74,7 @@ function todayISO(): string {
   return `${y}-${m}-${dd}`;
 }
 
-function toNum(v: any): number | undefined {
+function toNum(v: unknown): number | undefined {
   if (v === null || v === undefined) return undefined;
   const n =
     typeof v === "number" ? v : parseFloat(String(v).replace(/[^\d.\-]/g, ""));
@@ -88,7 +90,7 @@ function parseBP(raw?: string): { systolic?: number; diastolic?: number } {
 
 function normalize(rec: DailyMeasure): DailyMeasure {
   const { systolic, diastolic } =
-    rec.systolic && rec.diastolic
+    rec.systolic != null && rec.diastolic != null
       ? { systolic: rec.systolic, diastolic: rec.diastolic }
       : parseBP(rec.pressure);
 
@@ -111,14 +113,11 @@ function normalize(rec: DailyMeasure): DailyMeasure {
 function calcTightDomain(values: number[], minRange = 1): [number, number] {
   const nums = values.filter((v) => Number.isFinite(v)) as number[];
   if (!nums.length) return [0, 1];
-  let min = Math.min(...nums);
-  let max = Math.max(...nums);
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
   const span = Math.max(max - min, minRange);
   const pad = span * 0.1;
-  return [
-    Math.floor((min - pad) * 10) / 10,
-    Math.ceil((max + pad) * 10) / 10,
-  ];
+  return [Math.floor((min - pad) * 10) / 10, Math.ceil((max + pad) * 10) / 10];
 }
 
 /* =========================
@@ -188,9 +187,14 @@ function statusBMI(bmi?: number): Status | undefined {
 }
 
 // Water intake target: 0.03–0.035 L per kg
-function waterTarget(weightKg?: number): [number | undefined, number | undefined] {
+function waterTarget(
+  weightKg?: number
+): [number | undefined, number | undefined] {
   if (!weightKg) return [undefined, undefined];
-  return [Number((0.03 * weightKg).toFixed(2)), Number((0.035 * weightKg).toFixed(2))];
+  return [
+    Number((0.03 * weightKg).toFixed(2)),
+    Number((0.035 * weightKg).toFixed(2)),
+  ];
 }
 function statusWater(actualL?: number, weightKg?: number): Status | undefined {
   if (actualL == null || !weightKg) return undefined;
@@ -252,9 +256,29 @@ function clampNum(name: string, val: number | undefined) {
   return val;
 }
 
+function coerceRisk(x: unknown): Risk {
+  const allowed: Record<Risk, true> = {
+    Good: true,
+    OK: true,
+    Bad: true,
+    Emergency: true,
+    Unknown: true,
+  };
+  return typeof x === "string" && (allowed as Record<string, true>)[x]
+    ? (x as Risk)
+    : "Unknown";
+}
+
 /* =========================
    Component
 ========================= */
+
+type InputField = {
+  name: keyof DailyMeasure;
+  label: string;
+  type: React.HTMLInputTypeAttribute;
+  step?: string;
+};
 
 export default function DailyMeasurePage() {
   const { user } = useAuth();
@@ -267,36 +291,71 @@ export default function DailyMeasurePage() {
 
   // ADD near other state
   const [aiAdvice, setAiAdvice] = useState<string>("");
-  const [aiRisk, setAiRisk] = useState<"Good"|"OK"|"Bad"|"Emergency"|"Unknown">("Unknown");
+  const [aiRisk, setAiRisk] = useState<Risk>("Unknown");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiNotified, setAiNotified] = useState<boolean>(false);
 
-  const inputFields = useMemo(
+  const inputFields = useMemo<InputField[]>(
     () => [
       // Blood Pressure (numeric preferred)
       { name: "systolic", label: "Systolic (mmHg)", type: "number", step: "1" },
-      { name: "diastolic", label: "Diastolic (mmHg)", type: "number", step: "1" },
+      {
+        name: "diastolic",
+        label: "Diastolic (mmHg)",
+        type: "number",
+        step: "1",
+      },
       // Legacy optional field — keep if user types "120/80"
       { name: "pressure", label: "Blood Pressure (e.g. 120/80)", type: "text" },
 
       // Glucose (fasting + optional post)
-      { name: "sugarMgDl", label: "Fasting Sugar (mg/dL)", type: "number", step: "1" },
-      { name: "sugarPostMgDl", label: "2h Post Meal Sugar (mg/dL)", type: "number", step: "1" },
+      {
+        name: "sugarMgDl",
+        label: "Fasting Sugar (mg/dL)",
+        type: "number",
+        step: "1",
+      },
+      {
+        name: "sugarPostMgDl",
+        label: "2h Post Meal Sugar (mg/dL)",
+        type: "number",
+        step: "1",
+      },
 
       // Lipids
-      { name: "cholesterolTotal", label: "Total Cholesterol (mg/dL)", type: "number", step: "1" },
+      {
+        name: "cholesterolTotal",
+        label: "Total Cholesterol (mg/dL)",
+        type: "number",
+        step: "1",
+      },
 
       // Vitals
       { name: "spo2Pct", label: "SpO₂ (%)", type: "number", step: "1" },
-      { name: "temperatureC", label: "Temperature (°C)", type: "number", step: "0.1" },
+      {
+        name: "temperatureC",
+        label: "Temperature (°C)",
+        type: "number",
+        step: "0.1",
+      },
 
       // Body & activity
       { name: "weightKg", label: "Weight (kg)", type: "number", step: "0.1" },
       { name: "heightCm", label: "Height (cm)", type: "number", step: "1" },
-      { name: "exerciseMins", label: "Exercise Time (mins)", type: "number", step: "1" },
+      {
+        name: "exerciseMins",
+        label: "Exercise Time (mins)",
+        type: "number",
+        step: "1",
+      },
 
       // Water
-      { name: "waterIntakeL", label: "Water Intake (L/day)", type: "number", step: "0.1" },
+      {
+        name: "waterIntakeL",
+        label: "Water Intake (L/day)",
+        type: "number",
+        step: "0.1",
+      },
     ],
     []
   );
@@ -314,7 +373,7 @@ export default function DailyMeasurePage() {
   }, [user]);
 
   useEffect(() => {
-    if (user) loadRecords();
+    if (user) void loadRecords();
   }, [user, loadRecords]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,9 +384,9 @@ export default function DailyMeasurePage() {
       if (type === "number") {
         const num =
           value === "" ? undefined : clampNum(String(name), Number(value));
-        return { ...prev, [name]: num as any };
+        return { ...prev, [name]: num } as DailyMeasure;
       }
-      return { ...prev, [name]: value as any };
+      return { ...prev, [name]: value } as DailyMeasure;
     });
   };
 
@@ -349,20 +408,29 @@ export default function DailyMeasurePage() {
 
     const prev = records;
     // optimistic: ensure single entry per date at top
-    setRecords((rs) => [normalized, ...rs.filter((r) => r.date !== id)].slice(0, 14));
+    setRecords((rs) =>
+      [normalized, ...rs.filter((r) => r.date !== id)].slice(0, 14)
+    );
 
     try {
-      await setDoc(ref, { ...normalized, createdAt: Timestamp.now() }, { merge: true });
+      await setDoc(
+        ref,
+        { ...normalized, createdAt: Timestamp.now() },
+        { merge: true }
+      );
       setMsg("✅ Saved successfully!");
 
       // 👉 Run AI evaluation & possibly email alert
       setAiBusy(true);
       try {
-        const { advice, risk, notified } = await aiEvaluateDaily(normalized.date);
+        const { advice, risk, notified } = await aiEvaluateDaily(
+          normalized.date
+        );
         setAiAdvice(advice || "");
-        setAiRisk((risk as any) || "Unknown");
-        setAiNotified(!!notified);
+        setAiRisk(coerceRisk(risk));
+        setAiNotified(Boolean(notified));
       } catch (e) {
+        // keep UI responsive but don't fail the save
         console.error("AI eval failed", e);
         setAiAdvice("");
         setAiRisk("Unknown");
@@ -395,12 +463,13 @@ export default function DailyMeasurePage() {
   // Ascending date for charts
   const chartData = useMemo(() => records.slice().reverse(), [records]);
 
-  const pickNums = (k: keyof DailyMeasure) =>
-    chartData
-      .map((d) =>
-        typeof d[k] === "number" ? (d[k] as number) : undefined
-      )
-      .filter((v) => v != null) as number[];
+  const pickNums = useCallback(
+    (k: keyof DailyMeasure) =>
+      chartData
+        .map((d) => (typeof d[k] === "number" ? (d[k] as number) : undefined))
+        .filter((v): v is number => v != null),
+    [chartData]
+  );
 
   const domains = useMemo(() => {
     return {
@@ -414,7 +483,7 @@ export default function DailyMeasurePage() {
       temperatureC: calcTightDomain(pickNums("temperatureC"), 0.2),
       waterIntakeL: calcTightDomain(pickNums("waterIntakeL"), 0.2),
     } as const;
-  }, [chartData]);
+  }, [pickNums]);
 
   const latest = records[0] ? normalize(records[0]) : undefined;
   const latestBMI = calcBMI(latest?.weightKg, latest?.heightCm);
@@ -439,7 +508,7 @@ export default function DailyMeasurePage() {
       "waterIntakeL",
     ];
     const rows = [cols.join(",")]
-      .concat(ds.map((d) => cols.map((k) => (d[k] ?? "")).join(",")))
+      .concat(ds.map((d) => cols.map((k) => d[k] ?? "").join(",")))
       .join("\n");
     const blob = new Blob([rows], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -481,10 +550,15 @@ export default function DailyMeasurePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 text-white py-10 px-5">
       <div className="max-w-6xl mx-auto space-y-8">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold">🩺 Daily Health Measurements</h1>
+              <h1 className="text-3xl font-bold">
+                🩺 Daily Health Measurements
+              </h1>
               <p className="text-white/70 mt-1">
                 Enter your daily vitals and see compact trends with clear{" "}
                 <span className="text-white">Good/OK/Bad</span> status.
@@ -565,7 +639,9 @@ export default function DailyMeasurePage() {
               label="Water Intake"
               status={statusWater(latest.waterIntakeL, latest.weightKg)}
               unit="L/day"
-              value={latest.waterIntakeL != null ? latest.waterIntakeL : undefined}
+              value={
+                latest.waterIntakeL != null ? latest.waterIntakeL : undefined
+              }
             />
           </div>
         )}
@@ -577,18 +653,25 @@ export default function DailyMeasurePage() {
           className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-lg p-6"
         >
           <div className="grid gap-4 md:grid-cols-3">
-            {inputFields.map((f) => (
-              <input
-                key={f.name}
-                name={f.name as keyof DailyMeasure as string}
-                type={f.type as any}
-                step={f.step as any}
-                placeholder={f.label}
-                value={(form as any)[f.name] ?? ""}
-                onChange={handleChange}
-                className="rounded-xl border border-white/10 bg-black/40 p-2 focus:ring-2 focus:ring-green-400/50"
-              />
-            ))}
+            {inputFields.map((f) => {
+              const raw = (form as Record<string, unknown>)[f.name];
+              const valueProp =
+                typeof raw === "number"
+                  ? raw
+                  : (raw as string | undefined) ?? "";
+              return (
+                <input
+                  key={f.name as string}
+                  name={f.name as string}
+                  type={f.type}
+                  step={f.step}
+                  placeholder={f.label}
+                  value={valueProp}
+                  onChange={handleChange}
+                  className="rounded-xl border border-white/10 bg-black/40 p-2 focus:ring-2 focus:ring-green-400/50"
+                />
+              );
+            })}
             <input
               type="date"
               name="date"
@@ -653,15 +736,20 @@ export default function DailyMeasurePage() {
                 </span>
               </div>
               {aiBusy ? (
-                <p className="text-white/70 text-sm">Analyzing today’s readings…</p>
+                <p className="text-white/70 text-sm">
+                  Analyzing today’s readings…
+                </p>
               ) : aiAdvice ? (
-                <pre className="whitespace-pre-wrap text-sm text-white/90">{aiAdvice}</pre>
+                <pre className="whitespace-pre-wrap text-sm text-white/90">
+                  {aiAdvice}
+                </pre>
               ) : (
                 <p className="text-white/60 text-sm">No advice yet.</p>
               )}
               {aiNotified && (
                 <p className="mt-2 text-xs text-red-300">
-                  An alert email was sent to your emergency contact for today’s readings.
+                  An alert email was sent to your emergency contact for today’s
+                  readings.
                 </p>
               )}
               <div className="mt-3">
@@ -670,10 +758,12 @@ export default function DailyMeasurePage() {
                   onClick={async () => {
                     setAiBusy(true);
                     try {
-                      const { advice, risk, notified } = await aiEvaluateDaily(form.date);
+                      const { advice, risk, notified } = await aiEvaluateDaily(
+                        form.date
+                      );
                       setAiAdvice(advice || "");
-                      setAiRisk((risk as any) || "Unknown");
-                      setAiNotified(!!notified);
+                      setAiRisk(coerceRisk(risk));
+                      setAiNotified(Boolean(notified));
                     } catch (e) {
                       console.error(e);
                     } finally {
@@ -703,14 +793,30 @@ export default function DailyMeasurePage() {
                   className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-lg p-4"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-white/90">Blood Pressure</h3>
+                    <h3 className="font-medium text-white/90">
+                      Blood Pressure
+                    </h3>
                     {badge(statusBP(latest?.systolic, latest?.diastolic))}
                   </div>
                   <ResponsiveContainer width="100%" height={140}>
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3b3b3b" vertical={false} />
-                      <XAxis dataKey="date" stroke="#aaa" tick={{ fontSize: 11 }} tickMargin={6} />
-                      <YAxis domain={domains.systolic} stroke="#aaa" width={36} tick={{ fontSize: 11 }} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#3b3b3b"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#aaa"
+                        tick={{ fontSize: 11 }}
+                        tickMargin={6}
+                      />
+                      <YAxis
+                        domain={domains.systolic}
+                        stroke="#aaa"
+                        width={36}
+                        tick={{ fontSize: 11 }}
+                      />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "#222",
@@ -718,8 +824,22 @@ export default function DailyMeasurePage() {
                           color: "white",
                         }}
                       />
-                      <Line type="monotone" dataKey="systolic" stroke="#60A5FA" dot={false} strokeWidth={2} name="Systolic" />
-                      <Line type="monotone" dataKey="diastolic" stroke="#93C5FD" dot={false} strokeWidth={2} name="Diastolic" />
+                      <Line
+                        type="monotone"
+                        dataKey="systolic"
+                        stroke="#60A5FA"
+                        dot={false}
+                        strokeWidth={2}
+                        name="Systolic"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="diastolic"
+                        stroke="#93C5FD"
+                        dot={false}
+                        strokeWidth={2}
+                        name="Diastolic"
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </motion.div>
@@ -738,12 +858,43 @@ export default function DailyMeasurePage() {
                   </div>
                   <ResponsiveContainer width="100%" height={140}>
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3b3b3b" vertical={false} />
-                      <XAxis dataKey="date" stroke="#aaa" tick={{ fontSize: 11 }} tickMargin={6} />
-                      <YAxis domain={domains.sugarMgDl} stroke="#aaa" width={36} tick={{ fontSize: 11 }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#222", border: "1px solid #555", color: "white" }} />
-                      <ReferenceArea y1={70} y2={99} strokeOpacity={0} fill="#10B98133" />
-                      <Line type="monotone" dataKey="sugarMgDl" stroke="#FB7185" dot={false} strokeWidth={2} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#3b3b3b"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#aaa"
+                        tick={{ fontSize: 11 }}
+                        tickMargin={6}
+                      />
+                      <YAxis
+                        domain={domains.sugarMgDl}
+                        stroke="#aaa"
+                        width={36}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#222",
+                          border: "1px solid #555",
+                          color: "white",
+                        }}
+                      />
+                      <ReferenceArea
+                        y1={70}
+                        y2={99}
+                        strokeOpacity={0}
+                        fill="#10B98133"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="sugarMgDl"
+                        stroke="#FB7185"
+                        dot={false}
+                        strokeWidth={2}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </motion.div>
@@ -757,17 +908,50 @@ export default function DailyMeasurePage() {
                   className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-lg p-4"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-white/90">2h Post Meal Sugar</h3>
+                    <h3 className="font-medium text-white/90">
+                      2h Post Meal Sugar
+                    </h3>
                     {badge(statusSugarPost(latest?.sugarPostMgDl))}
                   </div>
                   <ResponsiveContainer width="100%" height={140}>
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3b3b3b" vertical={false} />
-                      <XAxis dataKey="date" stroke="#aaa" tick={{ fontSize: 11 }} tickMargin={6} />
-                      <YAxis domain={domains.sugarPostMgDl} stroke="#aaa" width={36} tick={{ fontSize: 11 }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#222", border: "1px solid #555", color: "white" }} />
-                      <ReferenceArea y1={0} y2={139} strokeOpacity={0} fill="#10B98133" />
-                      <Line type="monotone" dataKey="sugarPostMgDl" stroke="#F472B6" dot={false} strokeWidth={2} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#3b3b3b"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#aaa"
+                        tick={{ fontSize: 11 }}
+                        tickMargin={6}
+                      />
+                      <YAxis
+                        domain={domains.sugarPostMgDl}
+                        stroke="#aaa"
+                        width={36}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#222",
+                          border: "1px solid #555",
+                          color: "white",
+                        }}
+                      />
+                      <ReferenceArea
+                        y1={0}
+                        y2={139}
+                        strokeOpacity={0}
+                        fill="#10B98133"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="sugarPostMgDl"
+                        stroke="#F472B6"
+                        dot={false}
+                        strokeWidth={2}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </motion.div>
@@ -781,17 +965,50 @@ export default function DailyMeasurePage() {
                   className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-lg p-4"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-white/90">Total Cholesterol</h3>
+                    <h3 className="font-medium text-white/90">
+                      Total Cholesterol
+                    </h3>
                     {badge(statusCholTotal(latest?.cholesterolTotal))}
                   </div>
                   <ResponsiveContainer width="100%" height={140}>
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3b3b3b" vertical={false} />
-                      <XAxis dataKey="date" stroke="#aaa" tick={{ fontSize: 11 }} tickMargin={6} />
-                      <YAxis domain={domains.cholesterolTotal} stroke="#aaa" width={44} tick={{ fontSize: 11 }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#222", border: "1px solid #555", color: "white" }} />
-                      <ReferenceArea y1={0} y2={199} strokeOpacity={0} fill="#10B98133" />
-                      <Line type="monotone" dataKey="cholesterolTotal" stroke="#38BDF8" dot={false} strokeWidth={2} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#3b3b3b"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#aaa"
+                        tick={{ fontSize: 11 }}
+                        tickMargin={6}
+                      />
+                      <YAxis
+                        domain={domains.cholesterolTotal}
+                        stroke="#aaa"
+                        width={44}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#222",
+                          border: "1px solid #555",
+                          color: "white",
+                        }}
+                      />
+                      <ReferenceArea
+                        y1={0}
+                        y2={199}
+                        strokeOpacity={0}
+                        fill="#10B98133"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="cholesterolTotal"
+                        stroke="#38BDF8"
+                        dot={false}
+                        strokeWidth={2}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </motion.div>
@@ -810,12 +1027,38 @@ export default function DailyMeasurePage() {
                   </div>
                   <ResponsiveContainer width="100%" height={120}>
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3b3b3b" vertical={false} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#3b3b3b"
+                        vertical={false}
+                      />
                       <XAxis dataKey="date" stroke="#aaa" hide />
-                      <YAxis domain={domains.spo2Pct} stroke="#aaa" width={44} tick={{ fontSize: 11 }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#222", border: "1px solid #555", color: "white" }} />
-                      <ReferenceArea y1={95} y2={100} strokeOpacity={0} fill="#10B98133" />
-                      <Line type="monotone" dataKey="spo2Pct" stroke="#FBBF24" dot={false} strokeWidth={2} />
+                      <YAxis
+                        domain={domains.spo2Pct}
+                        stroke="#aaa"
+                        width={44}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#222",
+                          border: "1px solid #555",
+                          color: "white",
+                        }}
+                      />
+                      <ReferenceArea
+                        y1={95}
+                        y2={100}
+                        strokeOpacity={0}
+                        fill="#10B98133"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="spo2Pct"
+                        stroke="#FBBF24"
+                        dot={false}
+                        strokeWidth={2}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </motion.div>
@@ -834,12 +1077,38 @@ export default function DailyMeasurePage() {
                   </div>
                   <ResponsiveContainer width="100%" height={120}>
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3b3b3b" vertical={false} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#3b3b3b"
+                        vertical={false}
+                      />
                       <XAxis dataKey="date" stroke="#aaa" hide />
-                      <YAxis domain={domains.temperatureC} stroke="#aaa" width={44} tick={{ fontSize: 11 }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#222", border: "1px solid #555", color: "white" }} />
-                      <ReferenceArea y1={36.1} y2={37.2} strokeOpacity={0} fill="#10B98133" />
-                      <Line type="monotone" dataKey="temperatureC" stroke="#A78BFA" dot={false} strokeWidth={2} />
+                      <YAxis
+                        domain={domains.temperatureC}
+                        stroke="#aaa"
+                        width={44}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#222",
+                          border: "1px solid #555",
+                          color: "white",
+                        }}
+                      />
+                      <ReferenceArea
+                        y1={36.1}
+                        y2={37.2}
+                        strokeOpacity={0}
+                        fill="#10B98133"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="temperatureC"
+                        stroke="#A78BFA"
+                        dot={false}
+                        strokeWidth={2}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </motion.div>
@@ -858,11 +1127,37 @@ export default function DailyMeasurePage() {
                   </div>
                   <ResponsiveContainer width="100%" height={140}>
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3b3b3b" vertical={false} />
-                      <XAxis dataKey="date" stroke="#aaa" tick={{ fontSize: 11 }} tickMargin={6} />
-                      <YAxis domain={domains.weightKg} stroke="#aaa" width={44} tick={{ fontSize: 11 }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#222", border: "1px solid #555", color: "white" }} />
-                      <Line type="monotone" dataKey="weightKg" stroke="#34D399" dot={false} strokeWidth={2} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#3b3b3b"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#aaa"
+                        tick={{ fontSize: 11 }}
+                        tickMargin={6}
+                      />
+                      <YAxis
+                        domain={domains.weightKg}
+                        stroke="#aaa"
+                        width={44}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#222",
+                          border: "1px solid #555",
+                          color: "white",
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="weightKg"
+                        stroke="#34D399"
+                        dot={false}
+                        strokeWidth={2}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                   {latestBMI != null && (
@@ -881,15 +1176,32 @@ export default function DailyMeasurePage() {
                   className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-lg p-4"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-white/90">Daily Water Intake</h3>
+                    <h3 className="font-medium text-white/90">
+                      Daily Water Intake
+                    </h3>
                     {badge(statusWater(latest?.waterIntakeL, latest?.weightKg))}
                   </div>
                   <ResponsiveContainer width="100%" height={120}>
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3b3b3b" vertical={false} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#3b3b3b"
+                        vertical={false}
+                      />
                       <XAxis dataKey="date" stroke="#aaa" hide />
-                      <YAxis domain={domains.waterIntakeL} stroke="#aaa" width={44} tick={{ fontSize: 11 }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#222", border: "1px solid #555", color: "white" }} />
+                      <YAxis
+                        domain={domains.waterIntakeL}
+                        stroke="#aaa"
+                        width={44}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#222",
+                          border: "1px solid #555",
+                          color: "white",
+                        }}
+                      />
                       {latest?.weightKg && (
                         <ReferenceArea
                           y1={Number((0.03 * latest.weightKg).toFixed(2))}
@@ -898,15 +1210,20 @@ export default function DailyMeasurePage() {
                           fill="#10B98133"
                         />
                       )}
-                      <Line type="monotone" dataKey="waterIntakeL" stroke="#22D3EE" dot={false} strokeWidth={2} />
+                      <Line
+                        type="monotone"
+                        dataKey="waterIntakeL"
+                        stroke="#22D3EE"
+                        dot={false}
+                        strokeWidth={2}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                   {latest?.weightKg && (
                     <div className="text-xs text-white/70 mt-1">
-                      Target: {Number((0.03 * latest.weightKg).toFixed(2))}–{Number(
-                        (0.035 * latest.weightKg).toFixed(2)
-                      )}{" "}
-                      L/day (based on {latest.weightKg} kg)
+                      Target: {Number((0.03 * latest.weightKg).toFixed(2))}–
+                      {Number((0.035 * latest.weightKg).toFixed(2))} L/day
+                      (based on {latest.weightKg} kg)
                     </div>
                   )}
                 </motion.div>
@@ -958,11 +1275,10 @@ export default function DailyMeasurePage() {
 
                   <div className="text-white/80 mt-1">
                     BP: {rec.systolic ?? "-"} / {rec.diastolic ?? "-"} mmHg ·
-                    Fasting Sugar: {rec.sugarMgDl ?? "-"} mg/dL ·
-                    Post: {rec.sugarPostMgDl ?? "-"} mg/dL ·
-                    Chol: {rec.cholesterolTotal ?? "-"} mg/dL ·
-                    SpO₂: {rec.spo2Pct ?? "-"}% ·
-                    Temp: {rec.temperatureC ?? "-"}°C ·
+                    Fasting Sugar: {rec.sugarMgDl ?? "-"} mg/dL · Post:{" "}
+                    {rec.sugarPostMgDl ?? "-"} mg/dL · Chol:{" "}
+                    {rec.cholesterolTotal ?? "-"} mg/dL · SpO₂:{" "}
+                    {rec.spo2Pct ?? "-"}% · Temp: {rec.temperatureC ?? "-"}°C ·
                     Weight: {rec.weightKg ?? "-"} kg
                     {rec.heightCm ? ` · Height: ${rec.heightCm} cm` : ""} ·
                     Water: {rec.waterIntakeL ?? "-"} L

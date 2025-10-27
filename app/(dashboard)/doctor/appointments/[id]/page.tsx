@@ -31,6 +31,13 @@ type Attachment = {
   uploadedAt: number;
 };
 
+// Firestore user doc shape (for typing pSnap.data())
+type FirestoreUser = {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+};
+
 function fmtDate(d?: string | number | Date): string {
   if (!d) return "-";
   const date = new Date(d);
@@ -99,9 +106,9 @@ function AIPanel({
       const out = await aiSummarizeAppointment(appointmentId);
       setSummaryMode(toMode(out));
       setSummary(clean(out));
-    } catch (e: any) {
+    } catch (e: unknown) {
       setSummaryMode("Simulated");
-      setSummary(e?.message || "Could not summarize this appointment.");
+      setSummary(e instanceof Error ? e.message : "Could not summarize this appointment.");
     } finally {
       setBusy(null);
     }
@@ -114,9 +121,9 @@ function AIPanel({
       const out = await aiSoapFromNotes(notes);
       setSoapMode(toMode(out));
       setSoap(clean(out));
-    } catch (e: any) {
+    } catch (e: unknown) {
       setSoapMode("Simulated");
-      setSoap(e?.message || "Could not format notes.");
+      setSoap(e instanceof Error ? e.message : "Could not format notes.");
     } finally {
       setBusy(null);
     }
@@ -292,7 +299,7 @@ export default function DoctorAppointmentDetailPage() {
       // patient info
       const pSnap = await getDoc(doc(db, "users", a.patientId));
       if (pSnap.exists()) {
-        const d = pSnap.data() as any;
+        const d = pSnap.data() as FirestoreUser;
         setPatient({
           id: pSnap.id,
           fullName: d.fullName ?? "Unknown",
@@ -307,7 +314,7 @@ export default function DoctorAppointmentDetailPage() {
           phone: "-",
         });
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e);
       setError("Failed to load appointment.");
     } finally {

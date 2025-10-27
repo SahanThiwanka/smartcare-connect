@@ -1,7 +1,8 @@
+// ./components/DoctorAIPanel.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { aiSoapFromNotes, aiSummarizeAppointment } from "@/lib/aiClient";
 
@@ -34,7 +35,6 @@ export default function DoctorAIPanel({
   initialNotes?: string;
 }) {
   const [ready, setReady] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
   const [busy, setBusy] = useState<null | "summary" | "soap">(null);
 
   const [summary, setSummary] = useState("");
@@ -53,17 +53,14 @@ export default function DoctorAIPanel({
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
         try {
-          const cred = await signInAnonymously(auth);
-          setUser(cred.user);
+          await signInAnonymously(auth);
         } catch (e) {
           console.error("Anonymous sign-in failed:", e);
-          setUser(null);
         } finally {
           setReady(true);
         }
         return;
       }
-      setUser(u);
       setReady(true);
     });
     return () => unsub();

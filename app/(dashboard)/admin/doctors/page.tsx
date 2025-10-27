@@ -1,3 +1,4 @@
+// ./app/(dashboard)/admin/doctors/page.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,12 +26,12 @@ export default function AdminDoctorsPage() {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // ——— fetcher ———
-  const loadPending = async (_query: string = "") => {
+  const loadPending = async () => {
     setLoading(true);
     setError(null);
     try {
-      // If your getPendingDoctors supports a search param, this will use it.
-      // Otherwise it’ll just return all; we’ll still client-filter below.
+      // If your getPendingDoctors supports a search param, you could pass internalQuery.
+      // For now, fetch all and client-filter below.
       const docs = await getPendingDoctors();
       setPending(docs);
     } catch (err) {
@@ -70,7 +71,7 @@ export default function AdminDoctorsPage() {
       const name = (d.fullName || d.name || "").toLowerCase();
       const email = (d.email || "").toLowerCase();
       const spec = (d.specialty || "").toLowerCase();
-      const qual = (d.qualification || d.qualification || "").toLowerCase();
+      const qual = (d.qualification || "").toLowerCase();
       return (
         name.includes(q) ||
         email.includes(q) ||
@@ -118,7 +119,7 @@ export default function AdminDoctorsPage() {
     setError(null);
     try {
       await rejectDoctor(uid);
-      await loadPending(search);
+      await loadPending();
     } catch (err) {
       console.error("Reject failed:", err);
       setError("Reject failed. Check console for details.");
@@ -131,7 +132,7 @@ export default function AdminDoctorsPage() {
     // bypass debounce and fetch immediately
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setInternalQuery(search);
-    await loadPending(search);
+    await loadPending();
   };
 
   return (
@@ -155,7 +156,7 @@ export default function AdminDoctorsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") forceSearch();
+                  if (e.key === "Enter") void forceSearch();
                 }}
                 placeholder="Search by name, email, specialty, qualification…"
                 className="w-64 bg-transparent placeholder:text-white/50 focus:outline-none"
@@ -277,7 +278,7 @@ export default function AdminDoctorsPage() {
                                 <span className="text-white/50">
                                   Qualification:
                                 </span>{" "}
-                                {doc.qualification || doc.qualification || "—"}
+                                {doc.qualification || "—"}
                               </div>
                               <div>
                                 <span className="text-white/50">
@@ -302,7 +303,7 @@ export default function AdminDoctorsPage() {
                         {/* Actions */}
                         <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
                           <button
-                            onClick={() => handleApprove(doc)}
+                            onClick={() => void handleApprove(doc)}
                             disabled={processingUid === doc.uid}
                             className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 font-medium ${
                               processingUid === doc.uid
@@ -321,7 +322,7 @@ export default function AdminDoctorsPage() {
                           </button>
 
                           <button
-                            onClick={() => handleReject(doc.uid)}
+                            onClick={() => void handleReject(doc.uid)}
                             disabled={processingUid === doc.uid}
                             className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 font-medium ${
                               processingUid === doc.uid
