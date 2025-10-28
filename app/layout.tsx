@@ -17,6 +17,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SmartCare Connect",
+  manifest: '/manifest.webmanifest',
+  themeColor: '#1d4ed8',
   description: "A secure platform connecting patients and doctors.",
   keywords: [
     "SmartCare",
