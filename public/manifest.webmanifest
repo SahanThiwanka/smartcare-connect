@@ -46,5 +46,9 @@
       "is256x256": false,
       "is192x192": false
     }
+  ],
+  "categories": [
+    "health",
+    "medical"
   ]
 }
