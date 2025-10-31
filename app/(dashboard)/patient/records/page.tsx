@@ -24,6 +24,7 @@ import {
   Loader2,
   Stethoscope,
   User2,
+  X,
 } from "lucide-react";
 
 /* ─────────────────────────────── Types & helpers ───────────────────────────── */
@@ -88,16 +89,21 @@ const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({
 
 const Button: React.FC<
   React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    variant?: "solid" | "ghost";
+    variant?: "solid" | "ghost" | "danger";
+    full?: boolean;
   }
-> = ({ children, className, variant = "solid", ...props }) => (
+> = ({ children, className, variant = "solid", full = false, ...props }) => (
   <button
     {...props}
     className={[
-      "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition",
-      variant === "solid"
-        ? "bg-blue-600 text-white hover:bg-blue-500 disabled:bg-blue-900/40"
-        : "border border-white/10 bg-white/5 text-white/90 hover:bg-white/10",
+      "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition",
+      full ? "w-full" : "",
+      variant === "solid" &&
+        "bg-blue-600 text-white hover:bg-blue-500 disabled:bg-blue-900/40",
+      variant === "ghost" &&
+        "border border-white/10 bg-white/5 text-white/90 hover:bg-white/10",
+      variant === "danger" &&
+        "bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-60",
       className ?? "",
     ].join(" ")}
   >
@@ -248,26 +254,26 @@ export default function PatientRecordsPage() {
   /* ───────────── UI ───────────── */
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white py-10 px-6">
-      <div className="mx-auto w-full max-w-6xl space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white py-8 px-4 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
         <motion.h1
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-3xl font-bold text-center"
+          className="text-2xl sm:text-3xl font-bold text-center"
         >
           🗂️ My Health Records
         </motion.h1>
 
         {/* Upload */}
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <form
             onSubmit={onSubmit}
-            className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 min-w-0">
               <label
                 htmlFor="file"
-                className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 cursor-pointer"
               >
                 <Upload className="h-4 w-4" />
                 <span>Select file</span>
@@ -275,25 +281,23 @@ export default function PatientRecordsPage() {
               <input
                 id="file"
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
                 className="hidden"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
-              <span className="text-white/70 text-sm">
-                {file ? file.name : "PDF, JPG, PNG · up to 10MB"}
+              <span className="truncate text-white/70 text-xs sm:text-sm min-w-0">
+                {file ? file.name : "PDF, JPG, PNG (max 10MB)"}
               </span>
             </div>
 
-            <Button type="submit" disabled={!file || uploading}>
+            <Button type="submit" disabled={!file || uploading} full>
               {uploading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Uploading…
+                  <Loader2 className="h-4 w-4 animate-spin" /> Uploading…
                 </>
               ) : (
                 <>
-                  <Upload className="h-4 w-4" />
-                  Upload
+                  <Upload className="h-4 w-4" /> Upload
                 </>
               )}
             </Button>
@@ -301,17 +305,17 @@ export default function PatientRecordsPage() {
         </Card>
 
         {/* Sections */}
-        <div className="grid gap-8 lg:grid-cols-1">
+        <div className="grid gap-6 lg:grid-cols-1">
           {/* Doctor Attachments */}
-          <motion.div
+          <motion.section
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <Card className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Stethoscope className="h-5 w-5 text-emerald-400" />
-                  Doctor Attachments
+            <Card className="p-4 sm:p-5">
+              <div className="mb-3 sm:mb-4 flex items-center justify-between">
+                <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5 text-emerald-400" /> Doctor
+                  Attachments
                 </h2>
               </div>
 
@@ -335,9 +339,9 @@ export default function PatientRecordsPage() {
                           exit={{ opacity: 0, y: -6 }}
                           className="rounded-lg border border-white/10 bg-white/5 p-3"
                         >
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate font-medium">
+                              <p className="font-medium truncate">
                                 {d.fileName}
                               </p>
                               <p className="text-xs text-white/60">
@@ -346,7 +350,7 @@ export default function PatientRecordsPage() {
                               </p>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="grid grid-cols-2 sm:flex sm:flex-row items-center gap-2 sm:gap-2">
                               <Button
                                 variant="ghost"
                                 onClick={() =>
@@ -362,36 +366,33 @@ export default function PatientRecordsPage() {
                                     },
                                   })
                                 }
+                                full
                               >
-                                <Eye className="h-4 w-4" />
-                                Preview
+                                <Eye className="h-4 w-4" /> Preview
                               </Button>
-
                               <a
                                 href={d.fileUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
                               >
-                                <FileDown className="h-4 w-4" />
-                                View
+                                <FileDown className="h-4 w-4" /> View
                               </a>
-
                               {d.storagePath ? (
                                 <Button
                                   onClick={() => onDeleteDoctorAttachment(d)}
                                   disabled={isBusy}
-                                  className="bg-red-600 hover:bg-red-500"
+                                  variant="danger"
+                                  full
                                 >
                                   {isBusy ? (
                                     <>
-                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <Loader2 className="h-4 w-4 animate-spin" />{" "}
                                       Deleting…
                                     </>
                                   ) : (
                                     <>
-                                      <Trash2 className="h-4 w-4" />
-                                      Delete
+                                      <Trash2 className="h-4 w-4" /> Delete
                                     </>
                                   )}
                                 </Button>
@@ -405,18 +406,17 @@ export default function PatientRecordsPage() {
                 </div>
               )}
             </Card>
-          </motion.div>
+          </motion.section>
 
           {/* Patient Uploads */}
-          <motion.div
+          <motion.section
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <Card className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <User2 className="h-5 w-5 text-blue-400" />
-                  My Uploads
+            <Card className="p-4 sm:p-5">
+              <div className="mb-3 sm:mb-4 flex items-center justify-between">
+                <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+                  <User2 className="h-5 w-5 text-blue-400" /> My Uploads
                 </h2>
               </div>
 
@@ -437,9 +437,9 @@ export default function PatientRecordsPage() {
                           exit={{ opacity: 0, y: -6 }}
                           className="rounded-lg border border-white/10 bg-white/5 p-3"
                         >
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate font-medium">
+                              <p className="font-medium truncate">
                                 {r.fileName}
                               </p>
                               <p className="text-xs text-white/60">
@@ -447,7 +447,7 @@ export default function PatientRecordsPage() {
                               </p>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="grid grid-cols-2 sm:flex sm:flex-row items-center gap-2 sm:gap-2">
                               <Button
                                 variant="ghost"
                                 onClick={() =>
@@ -458,21 +458,18 @@ export default function PatientRecordsPage() {
                                     source: "patient",
                                   })
                                 }
+                                full
                               >
-                                <Eye className="h-4 w-4" />
-                                Preview
+                                <Eye className="h-4 w-4" /> Preview
                               </Button>
-
                               <a
                                 href={r.fileUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
                               >
-                                <FileDown className="h-4 w-4" />
-                                View
+                                <FileDown className="h-4 w-4" /> View
                               </a>
-
                               <Button
                                 onClick={() =>
                                   onDeletePatientRecord(
@@ -480,17 +477,17 @@ export default function PatientRecordsPage() {
                                   )
                                 }
                                 disabled={isBusy}
-                                className="bg-red-600 hover:bg-red-500"
+                                variant="danger"
+                                full
                               >
                                 {isBusy ? (
                                   <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader2 className="h-4 w-4 animate-spin" />{" "}
                                     Deleting…
                                   </>
                                 ) : (
                                   <>
-                                    <Trash2 className="h-4 w-4" />
-                                    Delete
+                                    <Trash2 className="h-4 w-4" /> Delete
                                   </>
                                 )}
                               </Button>
@@ -503,7 +500,7 @@ export default function PatientRecordsPage() {
                 </div>
               )}
             </Card>
-          </motion.div>
+          </motion.section>
         </div>
 
         {/* Empty page helper */}
@@ -531,16 +528,17 @@ export default function PatientRecordsPage() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
           >
-            <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
               <motion.div
-                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                initial={{ opacity: 0, y: 24, scale: 1 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10 }}
-                className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-gray-900 p-4 shadow-2xl"
+                exit={{ opacity: 0, y: 24, scale: 1 }}
+                transition={{ duration: 0.18 }}
+                className="w-full sm:max-w-3xl rounded-t-2xl sm:rounded-2xl border border-white/10 bg-gray-900 p-4 sm:p-5 shadow-2xl"
               >
-                <div className="flex items-center justify-between mb-3">
+                <div className="mb-3 flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <h3 className="truncate text-lg font-semibold text-white">
+                    <h3 className="truncate text-base sm:text-lg font-semibold text-white">
                       {preview.fileName}
                     </h3>
                     <p className="text-xs text-white/60">
@@ -550,12 +548,16 @@ export default function PatientRecordsPage() {
                       • {formatWhen(preview.createdAt)}
                     </p>
                   </div>
-                  <Button variant="ghost" onClick={() => setPreview(null)}>
-                    Close
+                  <Button
+                    variant="ghost"
+                    onClick={() => setPreview(null)}
+                    aria-label="Close preview"
+                  >
+                    <X className="h-5 w-5" />
                   </Button>
                 </div>
 
-                <div className="rounded-lg bg-white p-2">
+                <div className="rounded-lg bg-white p-2 max-h-[80vh] overflow-auto">
                   {renderPreview(preview)}
                 </div>
               </motion.div>

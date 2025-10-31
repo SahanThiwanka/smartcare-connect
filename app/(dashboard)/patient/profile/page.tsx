@@ -466,22 +466,6 @@ export default function PatientProfilePage() {
             )}
           </Section>
         </div>
-
-        {/* Footer info */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`${glass} p-4 text-sm text-white/70`}
-        >
-          <div className="flex flex-wrap items-center gap-4">
-            <Activity className="h-4 w-4 text-sky-300" /> Smooth local editing
-            (no focus loss)
-            <Hospital className="h-4 w-4 text-sky-300" /> Secure Firestore
-            update
-            <FileHeart className="h-4 w-4 text-sky-300" /> Dark glass UI with
-            sections
-          </div>
-        </motion.div>
       </div>
     </div>
   );
@@ -608,7 +592,7 @@ function LabeledSelect({
       >
         <option value="">Select</option>
         {options.map((o) => (
-          <option key={o} value={o}>
+          <option key={o} value={o}className="bg-gray-900 text-white">
             {o}
           </option>
         ))}
