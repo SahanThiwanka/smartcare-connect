@@ -180,8 +180,6 @@ export default function PatientProfilePage() {
     return isFinite(b) ? b : null;
   })();
 
-  const glass =
-    "rounded-2xl border border-white/10 bg-white/5 shadow-lg backdrop-blur-md";
 
   if (loading) {
     return (

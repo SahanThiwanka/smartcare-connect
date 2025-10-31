@@ -1,3 +1,4 @@
+// ./app/(dashboard)/patient/dashboard/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -6,7 +7,15 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { getAppointmentsByPatient, Appointment } from "@/lib/appointments";
 import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  type DocumentReference,
+} from "firebase/firestore";
 import {
   CalendarDays,
   Clock,
@@ -32,8 +41,8 @@ type DailyMeasure = {
   // legacy strings (back-compat)
   pressure?: string;
   cholesterol?: string;
-  sugar?: string;          // fasting
-  sugarPost?: string;      // 2h post
+  sugar?: string; // fasting
+  sugarPost?: string; // 2h post
   spo2?: string;
   exerciseTime?: string;
   temperature?: string;
@@ -59,7 +68,8 @@ type Status = "Good" | "OK" | "Bad" | "Emergency";
 
 function toNum(v: unknown): number | undefined {
   if (v == null) return undefined;
-  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^\d.\-]/g, ""));
+  const n =
+    typeof v === "number" ? v : parseFloat(String(v).replace(/[^\d.\-]/g, ""));
   return Number.isFinite(n) ? n : undefined;
 }
 function parseBP(raw?: string): { systolic?: number; diastolic?: number } {
@@ -159,6 +169,16 @@ function chip(status?: Status) {
 }
 
 /* =========================
+   Firestore typing for doctor names
+========================= */
+
+type DoctorNameDoc = {
+  fullName?: string;
+  name?: string;
+};
+type DocRef<T> = DocumentReference<T>;
+
+/* =========================
    Component
 ========================= */
 
@@ -194,24 +214,32 @@ export default function PatientDashboardPage() {
     })();
   }, [user]);
 
-  // fetch & cache doctor names
+  // fetch & cache doctor names (typed, no any)
   useEffect(() => {
     (async () => {
       const ids = Array.from(new Set(appointments.map((a) => a.doctorId))).filter(
         (id) => id && !doctorNames[id]
       );
       if (!ids.length) return;
+
       const entries = await Promise.all(
         ids.map(async (id) => {
           try {
-            const s = await getDoc(doc(db, "users", id));
-            return [id, (s.exists() && (s.data() as any).fullName) || id] as const;
+            const ref = doc(db, "users", id) as DocRef<DoctorNameDoc>;
+            const s = await getDoc(ref);
+            const data = s.data(); // DoctorNameDoc | undefined
+            const display =
+              (s.exists() && (data?.fullName || data?.name)) || id;
+            return [id, display] as const;
           } catch {
             return [id, id] as const;
           }
         })
       );
-      setDoctorNames((prev) => Object.fromEntries([...Object.entries(prev), ...entries]));
+
+      setDoctorNames((prev) =>
+        Object.fromEntries([...Object.entries(prev), ...entries])
+      );
     })();
   }, [appointments, doctorNames]);
 
@@ -329,7 +357,11 @@ export default function PatientDashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 text-white py-10 px-6">
       <div className="max-w-6xl mx-auto space-y-10">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
           <h1 className="text-3xl font-bold">
             Welcome back,{" "}
             <span className="text-green-400">
@@ -351,11 +383,27 @@ export default function PatientDashboardPage() {
         {/* Stats */}
         <div className="grid sm:grid-cols-3 gap-6">
           {[
-            { label: "Upcoming", value: upcoming, icon: <CalendarDays className="h-6 w-6 text-green-400" /> },
-            { label: "Pending", value: pending, icon: <Hourglass className="h-6 w-6 text-yellow-400" /> },
-            { label: "Completed", value: completed, icon: <CheckCircle2 className="h-6 w-6 text-blue-400" /> },
+            {
+              label: "Upcoming",
+              value: upcoming,
+              icon: <CalendarDays className="h-6 w-6 text-green-400" />,
+            },
+            {
+              label: "Pending",
+              value: pending,
+              icon: <Hourglass className="h-6 w-6 text-yellow-400" />,
+            },
+            {
+              label: "Completed",
+              value: completed,
+              icon: <CheckCircle2 className="h-6 w-6 text-blue-400" />,
+            },
           ].map((stat) => (
-            <motion.div key={stat.label} whileHover={{ scale: 1.03 }} className="p-5 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-md">
+            <motion.div
+              key={stat.label}
+              whileHover={{ scale: 1.03 }}
+              className="p-5 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-md"
+            >
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-lg font-semibold">{stat.label}</h2>
                 {stat.icon}
@@ -369,11 +417,15 @@ export default function PatientDashboardPage() {
         {health && (
           <div className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-lg p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <HeartPulse className="h-5 w-5 text-red-400" /> Latest Health Summary
+              <HeartPulse className="h-5 w-5 text-red-400" /> Latest Health
+              Summary
             </h2>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {healthCards.map((item) => (
-                <div key={item.key} className="rounded-xl border border-white/10 bg-black/30 p-3 flex flex-col gap-1 hover:bg-white/5 transition">
+                <div
+                  key={item.key}
+                  className="rounded-xl border border-white/10 bg-black/30 p-3 flex flex-col gap-1 hover:bg-white/5 transition"
+                >
                   <div className="flex items-center gap-2 text-white/70">
                     {item.icon}
                     <span className="text-sm">{item.label}</span>
@@ -397,14 +449,18 @@ export default function PatientDashboardPage() {
                 <Stethoscope className="h-4 w-4 text-white/70" />
                 Doctor:{" "}
                 <span className="text-green-400">
-                  {doctorNames[nextAppointment.doctorId] ?? nextAppointment.doctorId}
+                  {doctorNames[nextAppointment.doctorId] ??
+                    nextAppointment.doctorId}
                 </span>
               </p>
               <p className="text-sm text-white/70 mt-1">
                 Reason: {nextAppointment.reason || "No reason specified"}
               </p>
               <p className="mt-2 text-base">
-                {new Date(nextAppointment.date).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                {new Date(nextAppointment.date).toLocaleString([], {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
               </p>
               <p className="mt-2 text-green-400 font-medium">
                 Status: {nextAppointment.status.toUpperCase()}
@@ -423,14 +479,20 @@ export default function PatientDashboardPage() {
           <ul className="space-y-3">
             {recentAppointments.length > 0 ? (
               recentAppointments.map((a) => (
-                <li key={a.id} className="flex justify-between items-center border border-white/10 rounded-lg bg-black/30 p-3 hover:bg-white/5 transition">
+                <li
+                  key={a.id}
+                  className="flex justify-between items-center border border-white/10 rounded-lg bg-black/30 p-3 hover:bg-white/5 transition"
+                >
                   <div>
                     <p className="font-medium">
                       Appointment with{" "}
-                      <span className="text-green-400">{doctorNames[a.doctorId] ?? a.doctorId}</span>
+                      <span className="text-green-400">
+                        {doctorNames[a.doctorId] ?? a.doctorId}
+                      </span>
                     </p>
                     <p className="text-xs text-white/70">
-                      {new Date(a.date).toLocaleDateString()} — {a.reason || "No reason"}
+                      {new Date(a.date).toLocaleDateString()} —{" "}
+                      {a.reason || "No reason"}
                     </p>
                   </div>
                   <span
@@ -457,11 +519,30 @@ export default function PatientDashboardPage() {
         {/* Quick Links */}
         <div className="grid sm:grid-cols-3 gap-4">
           {[
-            { href: "/patient/appointments", label: "Book Appointment", icon: <CalendarDays className="h-5 w-5" />, color: "bg-green-600 hover:bg-green-500" },
-            { href: "/patient/history", label: "View History", icon: <Clock className="h-5 w-5" />, color: "bg-gray-700 hover:bg-gray-600" },
-            { href: "/patient/profile", label: "Edit Profile", icon: <User className="h-5 w-5" />, color: "bg-gray-700 hover:bg-gray-600" },
+            {
+              href: "/patient/appointments",
+              label: "Book Appointment",
+              icon: <CalendarDays className="h-5 w-5" />,
+              color: "bg-green-600 hover:bg-green-500",
+            },
+            {
+              href: "/patient/history",
+              label: "View History",
+              icon: <Clock className="h-5 w-5" />,
+              color: "bg-gray-700 hover:bg-gray-600",
+            },
+            {
+              href: "/patient/profile",
+              label: "Edit Profile",
+              icon: <User className="h-5 w-5" />,
+              color: "bg-gray-700 hover:bg-gray-600",
+            },
           ].map((link) => (
-            <Link key={link.href} href={link.href} className={`${link.color} flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition`}>
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`${link.color} flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition`}
+            >
               {link.icon}
               {link.label}
             </Link>
