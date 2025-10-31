@@ -18,7 +18,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SmartCare Connect",
   manifest: '/manifest.webmanifest',
-  themeColor: '#1d4ed8',
   description: "A secure platform connecting patients and doctors.",
   keywords: [
     "SmartCare",
@@ -44,6 +43,16 @@ export const metadata: Metadata = {
     ],
     locale: "en_US",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og/cover.png"],
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ]
   },
 };
 
