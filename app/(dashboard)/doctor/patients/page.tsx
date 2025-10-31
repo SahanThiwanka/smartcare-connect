@@ -194,19 +194,6 @@ function statusBMI(bmi?: number): Status | undefined {
   if (bmi >= 30.0) return "Bad";
   return undefined;
 }
-function statusWater(actualL?: number, weightKg?: number): Status | undefined {
-  if (actualL == null || !weightKg) return undefined;
-  const min = Number((0.03 * weightKg).toFixed(2));
-  const max = Number((0.035 * weightKg).toFixed(2));
-  if (actualL >= min && actualL <= max) return "Good";
-  const slack = 0.25;
-  if (
-    (actualL >= min - slack && actualL < min) ||
-    (actualL > max && actualL <= max + slack)
-  )
-    return "OK";
-  return "Bad";
-}
 function badge(status?: Status) {
   if (!status) return null;
   const map: Record<Status, string> = {
