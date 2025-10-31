@@ -136,51 +136,57 @@ export default function AdminDoctorsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white py-8 px-6">
-      <div className="mx-auto w-full max-w-6xl space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white py-8 px-4 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
           <motion.h1
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-bold"
+            className="text-xl sm:text-2xl font-bold"
           >
             Pending Doctor Approvals
           </motion.h1>
 
           {/* Search bar */}
           <Card>
-            <div className="flex items-center gap-2 px-3 py-2">
-              <Search className="h-5 w-5 text-white/70" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void forceSearch();
-                }}
-                placeholder="Search by name, email, specialty, qualification…"
-                className="w-64 bg-transparent placeholder:text-white/50 focus:outline-none"
-              />
-              <button
-                onClick={() => setSearch("")}
-                className="ml-2 rounded-md border border-white/10 px-2 py-1 text-xs hover:bg-white/10"
-              >
-                Clear
-              </button>
-              <button
-                onClick={forceSearch}
-                className="ml-2 inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-xs hover:bg-white/20"
-                title="Refresh"
-              >
-                <RefreshCw className="h-4 w-4" /> Search
-              </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center px-3 py-2">
+              <div className="flex items-center gap-2">
+                <Search className="h-5 w-5 text-white/70" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void forceSearch();
+                  }}
+                  type="search"
+                  enterKeyHint="search"
+                  placeholder="Search by name, email, specialty, qualification…"
+                  className="w-full sm:w-64 min-w-0 bg-transparent placeholder:text-white/50 focus:outline-none text-sm sm:text-base"
+                />
+              </div>
+              <div className="flex gap-2 sm:ml-2">
+                <button
+                  onClick={() => setSearch("")}
+                  className="w-full sm:w-auto rounded-md border border-white/10 px-3 py-2 text-sm sm:text-xs hover:bg-white/10"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={forceSearch}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1 rounded-md bg-white/10 px-3 py-2 text-sm sm:text-xs hover:bg-white/20"
+                  title="Refresh"
+                >
+                  <RefreshCw className="h-4 w-4" /> Search
+                </button>
+              </div>
             </div>
           </Card>
         </div>
 
         {/* Error bar */}
         {error && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200" aria-live="polite">
             {error}
           </div>
         )}
@@ -238,7 +244,7 @@ export default function AdminDoctorsPage() {
                     <Card>
                       <div className="p-5">
                         {/* Top row */}
-                        <div className="flex items-start gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                           {/* Avatar */}
                           <div className="shrink-0">
                             {doc.photoURL ? (
@@ -247,52 +253,46 @@ export default function AdminDoctorsPage() {
                                 alt={name}
                                 width={96}
                                 height={96}
-                                className="h-24 w-24 rounded-full border border-white/10 object-cover"
+                                className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border border-white/10 object-cover"
                               />
                             ) : (
-                              <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/10 text-3xl">
+                              <div className="flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full border border-white/10 bg-white/10 text-3xl">
                                 👨‍⚕️
                               </div>
                             )}
                           </div>
 
                           {/* Info */}
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-lg font-bold">{name}</h3>
+                              <h3 className="text-base sm:text-lg font-bold break-words">{name}</h3>
                               <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-xs text-white/80">
                                 {doc.specialty || "—"}
                               </span>
                             </div>
 
                             <div className="mt-2 grid grid-cols-1 gap-2 text-sm text-white/80 sm:grid-cols-2">
-                              <div>
+                              <div className="break-words">
                                 <span className="text-white/50">Email:</span>{" "}
                                 {doc.email || "—"}
                               </div>
-                              <div>
+                              <div className="break-words">
                                 <span className="text-white/50">Phone:</span>{" "}
                                 {doc.phone || "—"}
                               </div>
-                              <div>
-                                <span className="text-white/50">
-                                  Qualification:
-                                </span>{" "}
+                              <div className="break-words">
+                                <span className="text-white/50">Qualification:</span>{" "}
                                 {doc.qualification || "—"}
                               </div>
-                              <div>
-                                <span className="text-white/50">
-                                  Experience:
-                                </span>{" "}
-                                {doc.experienceYears
-                                  ? `${doc.experienceYears} years`
-                                  : "—"}
+                              <div className="break-words">
+                                <span className="text-white/50">Experience:</span>{" "}
+                                {doc.experienceYears ? `${doc.experienceYears} years` : "—"}
                               </div>
-                              <div className="sm:col-span-2">
+                              <div className="sm:col-span-2 break-words">
                                 <span className="text-white/50">Clinic:</span>{" "}
                                 {doc.clinicAddress || "—"}
                               </div>
-                              <div>
+                              <div className="break-words">
                                 <span className="text-white/50">Fee:</span>{" "}
                                 {doc.consultationFee || "—"}
                               </div>
@@ -301,16 +301,17 @@ export default function AdminDoctorsPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+                        <div className="mt-5 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-end gap-2">
                           <button
                             onClick={() => void handleApprove(doc)}
                             disabled={processingUid === doc.uid}
-                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 font-medium ${
+                            className={`w-full sm:w-auto inline-flex items-center justify-center gap-1 rounded-lg px-3 py-2 font-medium ${
                               processingUid === doc.uid
                                 ? "bg-white/10 text-white/50"
                                 : "bg-emerald-500 text-black hover:bg-emerald-400"
                             }`}
                             title="Approve and send email"
+                            aria-busy={processingUid === doc.uid}
                           >
                             {processingUid === doc.uid ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -324,12 +325,13 @@ export default function AdminDoctorsPage() {
                           <button
                             onClick={() => void handleReject(doc.uid)}
                             disabled={processingUid === doc.uid}
-                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 font-medium ${
+                            className={`w-full sm:w-auto inline-flex items-center justify-center gap-1 rounded-lg px-3 py-2 font-medium ${
                               processingUid === doc.uid
                                 ? "bg-white/10 text-white/50"
                                 : "bg-red-500 text-white hover:bg-red-400"
                             }`}
                             title="Reject"
+                            aria-busy={processingUid === doc.uid}
                           >
                             {processingUid === doc.uid ? (
                               <Loader2 className="h-4 w-4 animate-spin" />

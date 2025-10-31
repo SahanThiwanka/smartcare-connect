@@ -67,8 +67,8 @@ export default function LoginPage() {
       }
 
       if (!data.profileCompleted) router.push("/setup-profile");
-      else if (data.role === "patient") router.push("/patient/profile");
-      else if (data.role === "doctor") router.push("/doctor/profile");
+      else if (data.role === "patient") router.push("/patient/dashboard");
+      else if (data.role === "doctor") router.push("/doctor/dashboard");
       else if (data.role === "admin") router.push("/admin");
       else router.push("/");
     } catch (err: unknown) {
@@ -100,8 +100,8 @@ export default function LoginPage() {
       }
 
       if (!data.profileCompleted) router.push("/setup-profile");
-      else if (data.role === "patient") router.push("/patient/profile");
-      else if (data.role === "doctor") router.push("/doctor/profile");
+      else if (data.role === "patient") router.push("/patient/dashboard");
+      else if (data.role === "doctor") router.push("/doctor/dashboard");
       else if (data.role === "admin") router.push("/admin");
       else router.push("/");
     } catch (err: unknown) {
