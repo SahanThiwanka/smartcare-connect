@@ -60,6 +60,13 @@ type DailyMeasure = {
   heightCm?: number;
   waterIntakeL?: number;
 
+  // New metadata
+  note?: string;
+  source?: "patient" | "caregiver";
+  addedByUid?: string;
+  addedByRole?: "patient" | "caregiver" | "doctor" | "admin";
+  addedByName?: string;
+
   createdAt?: Timestamp;
 };
 
@@ -281,7 +288,7 @@ type InputField = {
 };
 
 export default function DailyMeasurePage() {
-  const { user } = useAuth();
+  const { user, role, userDoc } = useAuth();
   const [form, setForm] = useState<DailyMeasure>({
     date: todayISO(),
   });
@@ -376,10 +383,8 @@ export default function DailyMeasurePage() {
     if (user) void loadRecords();
   }, [user, loadRecords]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = e.target as HTMLInputElement & {
-      name: keyof DailyMeasure;
-    };
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target as (HTMLInputElement & { name: keyof DailyMeasure }) | (HTMLTextAreaElement & { name: keyof DailyMeasure });
     setForm((prev) => {
       if (type === "number") {
         const num =
@@ -406,31 +411,45 @@ export default function DailyMeasurePage() {
     const id = normalized.date || todayISO();
     const ref = doc(db, "users", user.uid, "dailyMeasures", id);
 
+    // attach metadata
+    const addedByRole = (role ?? "patient") as DailyMeasure["addedByRole"];
+    const addedByName =
+      (userDoc && (userDoc.fullName as string)) ||
+      user.displayName ||
+      user.email?.split("@")[0] ||
+      "Unknown";
+    const source: DailyMeasure["source"] =
+      addedByRole === "caregiver" ? "caregiver" : "patient";
+
+    const payload: DailyMeasure = {
+      ...normalized,
+      source,
+      addedByUid: user.uid,
+      addedByRole,
+      addedByName,
+      createdAt: Timestamp.now(),
+    };
+
     const prev = records;
     // optimistic: ensure single entry per date at top
     setRecords((rs) =>
-      [normalized, ...rs.filter((r) => r.date !== id)].slice(0, 14)
+      [payload, ...rs.filter((r) => r.date !== id)].slice(0, 14)
     );
 
     try {
-      await setDoc(
-        ref,
-        { ...normalized, createdAt: Timestamp.now() },
-        { merge: true }
-      );
+      await setDoc(ref, payload, { merge: true });
       setMsg("✅ Saved successfully!");
 
       // 👉 Run AI evaluation & possibly email alert
       setAiBusy(true);
       try {
         const { advice, risk, notified } = await aiEvaluateDaily(
-          normalized.date
+          payload.date
         );
         setAiAdvice(advice || "");
         setAiRisk(coerceRisk(risk));
         setAiNotified(Boolean(notified));
       } catch (e) {
-        // keep UI responsive but don't fail the save
         console.error("AI eval failed", e);
         setAiAdvice("");
         setAiRisk("Unknown");
@@ -450,6 +469,12 @@ export default function DailyMeasurePage() {
 
   async function deleteRecord(date: string) {
     if (!user) return;
+    // OPTIONAL: lock deletion if not creator (uncomment to enforce)
+    // const rec = records.find(r => r.date === date);
+    // if (rec && rec.addedByUid && rec.addedByUid !== user.uid) {
+    //   alert("You can’t delete a record created by someone else.");
+    //   return;
+    // }
     if (!confirm(`Delete record for ${date}?`)) return;
     try {
       await deleteDoc(doc(db, "users", user.uid, "dailyMeasures", date));
@@ -506,9 +531,13 @@ export default function DailyMeasurePage() {
       "heightCm",
       "exerciseMins",
       "waterIntakeL",
+      "source",
+      "addedByRole",
+      "addedByName",
+      "note",
     ];
     const rows = [cols.join(",")]
-      .concat(ds.map((d) => cols.map((k) => d[k] ?? "").join(",")))
+      .concat(ds.map((d) => cols.map((k) => (d[k] ?? "") as any).join(",")))
       .join("\n");
     const blob = new Blob([rows], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -681,8 +710,25 @@ export default function DailyMeasurePage() {
             />
           </div>
 
+          {/* Optional note (useful for caregivers) */}
+          <div className="mt-3">
+            <textarea
+              name="note"
+              placeholder={role === "caregiver" ? "Add a note (e.g., measured at 8:30 AM at home)" : "Note (optional)"}
+              value={form.note ?? ""}
+              onChange={handleChange}
+              className="w-full rounded-xl border border-white/10 bg-black/40 p-2 focus:ring-2 focus:ring-green-400/50"
+              rows={2}
+            />
+            {role === "caregiver" && (
+              <div className="mt-1 text-xs text-white/60">
+                This entry will be labeled as <b>Caregiver</b> in the patient’s list.
+              </div>
+            )}
+          </div>
+
           {/* Presets */}
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap gap-2 mt-3">
             {presets.map((p) => (
               <button
                 key={p.label}
@@ -1239,13 +1285,22 @@ export default function DailyMeasurePage() {
             {records.map((r) => {
               const rec = normalize(r);
               const bmi = calcBMI(rec.weightKg, rec.heightCm);
+              const sourceChip =
+                rec.source === "caregiver"
+                  ? "bg-blue-500/20 text-blue-200 border-blue-400/30"
+                  : "bg-white/10 text-white/70 border-white/20";
               return (
                 <div
                   key={r.date}
                   className="rounded-xl border border-white/10 bg-black/30 backdrop-blur-sm p-3 text-sm hover:bg-white/5 transition"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <b>{r.date}</b>
+                    <div className="flex items-center gap-2">
+                      <b>{r.date}</b>
+                      <span className={`text-2xs px-2 py-0.5 rounded border ${sourceChip}`}>
+                        {rec.source === "caregiver" ? `Caregiver${rec.addedByName ? ` • ${rec.addedByName}` : ""}` : "Patient"}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setForm(rec)}
@@ -1262,7 +1317,13 @@ export default function DailyMeasurePage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mt-1">
+                  {rec.note && (
+                    <div className="mt-1 text-white/70">
+                      <span className="text-white/60">Note:</span> {rec.note}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 mt-2">
                     {badge(statusBP(rec.systolic, rec.diastolic))}
                     {badge(statusSugarFasting(rec.sugarMgDl))}
                     {badge(statusSugarPost(rec.sugarPostMgDl))}

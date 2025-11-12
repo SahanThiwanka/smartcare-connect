@@ -34,22 +34,18 @@ export default function Navbar() {
               {role === "patient" && (
                 <>
                   {!profileCompleted ? (
-                    <Link href="/setup-profile" className="hover:text-blue-400">
-                      Complete Profile
-                    </Link>
+                    <NavLink href="/setup-profile">Complete Profile</NavLink>
                   ) : (
                     <>
                       <NavLink href="/patient/dashboard">Dashboard</NavLink>
                       <NavLink href="/patient/profile">Profile</NavLink>
-                      <NavLink href="/patient/daily-measure">
-                        Daily Measure
-                      </NavLink>
-                      <NavLink href="/patient/appointments">
-                        Appointments
-                      </NavLink>
+                      <NavLink href="/patient/daily-measure">Daily Measure</NavLink>
+                      <NavLink href="/patient/appointments">Appointments</NavLink>
                       <NavLink href="/patient/records">Records</NavLink>
                       <NavLink href="/patient/history">History</NavLink>
                       <NavLink href="/patient/copilot">Copilot</NavLink>
+                      {/* Optional: Caregiver access pages for patients */}
+                      <NavLink href="/patient/caregiver">Caregivers</NavLink>
                     </>
                   )}
                 </>
@@ -59,12 +55,7 @@ export default function Navbar() {
               {role === "doctor" && (
                 <>
                   {!profileCompleted ? (
-                    <Link
-                      href="/setup-profile"
-                      className="hover:text-green-400"
-                    >
-                      Complete Profile
-                    </Link>
+                    <NavLink href="/setup-profile">Complete Profile</NavLink>
                   ) : approved === false ? (
                     <span className="text-yellow-400">Awaiting Approval</span>
                   ) : (
@@ -72,9 +63,24 @@ export default function Navbar() {
                       <NavLink href="/doctor/dashboard">Dashboard</NavLink>
                       <NavLink href="/doctor/profile">Profile</NavLink>
                       <NavLink href="/doctor/patients">Patients</NavLink>
-                      <NavLink href="/doctor/appointments">
-                        Appointments
-                      </NavLink>
+                      <NavLink href="/doctor/appointments">Appointments</NavLink>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* CAREGIVER */}
+              {role === "caregiver" && (
+                <>
+                  {!profileCompleted ? (
+                    <NavLink href="/setup-profile">Complete Profile</NavLink>
+                  ) : (
+                    <>
+                      <NavLink href="/caregiver/dashboard">Dashboard</NavLink>
+                      <NavLink href="/caregiver/profile">Profile</NavLink>
+                      {/* Patients who have granted access / pending requests */}
+                      <NavLink href="/caregiver/requests">Requests</NavLink>
+                      <NavLink href="/caregiver/patients">My Patients</NavLink>
                     </>
                   )}
                 </>
@@ -100,6 +106,7 @@ export default function Navbar() {
             <>
               <NavLink href="/patient/register">Patient Register</NavLink>
               <NavLink href="/doctor/register">Doctor Register</NavLink>
+              <NavLink href="/caregiver/register">Caregiver Register</NavLink>
               <NavLink href="/login">Login</NavLink>
             </>
           )}
@@ -109,6 +116,7 @@ export default function Navbar() {
         <button
           onClick={toggleMenu}
           className="md:hidden p-2 rounded hover:bg-white/10 transition"
+          aria-label="Toggle menu"
         >
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
@@ -131,16 +139,17 @@ export default function Navbar() {
                 {role === "patient" && (
                   <>
                     {!profileCompleted ? (
-                      <Link href="/setup-profile">Complete Profile</Link>
+                      <MobileLink href="/setup-profile">Complete Profile</MobileLink>
                     ) : (
                       <>
-                        <Link href="/patient/dashboard">Dashboard</Link>
-                        <Link href="/patient/profile">Profile</Link>
-                        <Link href="/patient/daily-measure">Daily Measure</Link>
-                        <Link href="/patient/appointments">Appointments</Link>
-                        <Link href="/patient/records">Records</Link>
-                        <Link href="/patient/history">History</Link>
-                         <Link href="/patient/copilot">Copilot</Link>
+                        <MobileLink href="/patient/dashboard">Dashboard</MobileLink>
+                        <MobileLink href="/patient/profile">Profile</MobileLink>
+                        <MobileLink href="/patient/daily-measure">Daily Measure</MobileLink>
+                        <MobileLink href="/patient/appointments">Appointments</MobileLink>
+                        <MobileLink href="/patient/records">Records</MobileLink>
+                        <MobileLink href="/patient/history">History</MobileLink>
+                        <MobileLink href="/patient/copilot">Copilot</MobileLink>
+                        <MobileLink href="/patient/caregiver">Caregivers</MobileLink>
                       </>
                     )}
                   </>
@@ -149,15 +158,30 @@ export default function Navbar() {
                 {role === "doctor" && (
                   <>
                     {!profileCompleted ? (
-                      <Link href="/setup-profile">Complete Profile</Link>
+                      <MobileLink href="/setup-profile">Complete Profile</MobileLink>
                     ) : approved === false ? (
                       <span className="text-yellow-400">Awaiting Approval</span>
                     ) : (
                       <>
-                        <Link href="/doctor/dashboard">Dashboard</Link>
-                        <Link href="/doctor/profile">Profile</Link>
-                        <Link href="/doctor/patients">Patients</Link>
-                        <Link href="/doctor/appointments">Appointments</Link>
+                        <MobileLink href="/doctor/dashboard">Dashboard</MobileLink>
+                        <MobileLink href="/doctor/profile">Profile</MobileLink>
+                        <MobileLink href="/doctor/patients">Patients</MobileLink>
+                        <MobileLink href="/doctor/appointments">Appointments</MobileLink>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {role === "caregiver" && (
+                  <>
+                    {!profileCompleted ? (
+                      <MobileLink href="/setup-profile">Complete Profile</MobileLink>
+                    ) : (
+                      <>
+                        <MobileLink href="/caregiver/dashboard">Dashboard</MobileLink>
+                        <MobileLink href="/caregiver/profile">Profile</MobileLink>
+                        <MobileLink href="/caregiver/requests">Requests</MobileLink>
+                        <MobileLink href="/caregiver/patients">My Patients</MobileLink>
                       </>
                     )}
                   </>
@@ -165,24 +189,28 @@ export default function Navbar() {
 
                 {role === "admin" && (
                   <>
-                    <Link href="/admin">Dashboard</Link>
-                    <Link href="/admin/doctors">Approve Doctors</Link>
-                    <Link href="/admin/users">User Management</Link>
+                    <MobileLink href="/admin">Dashboard</MobileLink>
+                    <MobileLink href="/admin/doctors">Approve Doctors</MobileLink>
+                    <MobileLink href="/admin/users">User Management</MobileLink>
                   </>
                 )}
 
                 <button
-                  onClick={logout}
-                  className="mt-2 rounded-md border border-white/20 px-3 py-1.5 hover:bg-white/10 transition"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    logout();
+                  }}
+                  className="mt-2 rounded-md border border-white/20 px-3 py-1.5 hover:bg-white/10 transition text-left"
                 >
                   Logout
                 </button>
               </>
             ) : (
               <>
-                <Link href="/patient/register">Patient Register</Link>
-                <Link href="/doctor/register">Doctor Register</Link>
-                <Link href="/login">Login</Link>
+                <MobileLink href="/patient/register">Patient Register</MobileLink>
+                <MobileLink href="/doctor/register">Doctor Register</MobileLink>
+                <MobileLink href="/caregiver/register">Caregiver Register</MobileLink>
+                <MobileLink href="/login">Login</MobileLink>
               </>
             )}
           </motion.div>
@@ -192,14 +220,9 @@ export default function Navbar() {
   );
 }
 
-// 🔹 Reusable NavLink with underline animation
-function NavLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) {
+/* ============ Small link helpers ============ */
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <motion.div whileHover={{ scale: 1.05 }} className="relative group">
       <Link href={href} className="hover:text-blue-400 transition">
@@ -207,5 +230,19 @@ function NavLink({
       </Link>
       <span className="absolute bottom-0 left-0 w-0 group-hover:w-full h-0.5 bg-blue-400 transition-all duration-300" />
     </motion.div>
+  );
+}
+
+function MobileLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-md px-2 py-2 hover:bg-white/10 transition"
+      onClick={() => {
+        // No-op here; parent closes the menu on logout only.
+      }}
+    >
+      {children}
+    </Link>
   );
 }

@@ -1,4 +1,3 @@
-// app/setup-profile/page.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -7,6 +6,10 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
+
+/* =========================
+   Types
+========================= */
 
 type ProfileForm = {
   // Common
@@ -37,6 +40,15 @@ type ProfileForm = {
   experienceYears?: string;
   clinicAddress?: string;
   consultationFee?: string;
+
+  // Caregiver-only
+  cgDisplayName?: string;
+  cgRelationshipTypes?: string[]; // e.g., Parent / Sibling / Spouse / Professional
+  cgOpenForRequests?: boolean;
+  cgNotes?: string;
+  cgServiceArea?: string; // optional: district/city
+  cgPreferredLanguages?: string[];
+  cgCanAddDailyMeasures?: boolean;
 };
 
 const chronicList = [
@@ -54,7 +66,12 @@ const chronicList = [
 
 const languageList = ["English", "Tamil", "Sinhala"];
 
-// -------- UI helpers --------
+const relationshipTypes = ["Parent", "Sibling", "Spouse", "Relative", "Friend", "Professional"];
+
+/* =========================
+   UI helpers
+========================= */
+
 const StepShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-xl ring-1 ring-white/10 p-5 sm:p-6">
     {children}
@@ -94,9 +111,18 @@ const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
   />
 );
 
-const SectionTitle: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => <h3 className="text-lg font-semibold text-white/90">{children}</h3>;
+const Textarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
+  <textarea
+    {...props}
+    className={`w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-white placeholder-white/40 outline-none focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/20 ${
+      props.className ?? ""
+    }`}
+  />
+);
+
+const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <h3 className="text-lg font-semibold text-white/90">{children}</h3>
+);
 
 const StepTag: React.FC<{
   active?: boolean;
@@ -119,17 +145,16 @@ const StepTag: React.FC<{
       <span className="text-lg">{icon}</span>
     </div>
     <div className="flex flex-col">
-      <span className="text-xs uppercase tracking-wide text-white/50">
-        Step {step}
-      </span>
-      <span className={`text-sm ${active ? "text-white" : "text-white/70"}`}>
-        {label}
-      </span>
+      <span className="text-xs uppercase tracking-wide text-white/50">Step {step}</span>
+      <span className={`text-sm ${active ? "text-white" : "text-white/70"}`}>{label}</span>
     </div>
   </div>
 );
 
-// -------- Page --------
+/* =========================
+   Page
+========================= */
+
 export default function SetupProfilePage() {
   const { user, role } = useAuth();
   const router = useRouter();
@@ -141,17 +166,11 @@ export default function SetupProfilePage() {
 
   const isPatient = role === "patient";
   const isDoctor = role === "doctor";
+  const isCaregiver = role === "caregiver";
 
   // ---- validation per step ----
   const step1Valid = useMemo(
-    () =>
-      !!(
-        form.fullName &&
-        form.phone &&
-        form.gender &&
-        form.dob &&
-        form.maritalStatus
-      ),
+    () => !!(form.fullName && form.phone && form.gender && form.dob && form.maritalStatus),
     [form.fullName, form.phone, form.gender, form.dob, form.maritalStatus]
   );
 
@@ -162,27 +181,27 @@ export default function SetupProfilePage() {
     if (isDoctor) {
       return !!(form.qualification && form.specialty && form.licenseNumber);
     }
+    if (isCaregiver) {
+      // minimum caregiver profile requirements
+      return !!(form.cgDisplayName);
+    }
     return false;
   }, [
     isPatient,
     isDoctor,
+    isCaregiver,
     form.height,
     form.weight,
     form.bloodGroup,
     form.qualification,
     form.specialty,
     form.licenseNumber,
+    form.cgDisplayName,
   ]);
 
-  const progress = useMemo(
-    () => (step === 1 ? 33 : step === 2 ? 66 : 100),
-    [step]
-  );
+  const progress = useMemo(() => (step === 1 ? 33 : step === 2 ? 66 : 100), [step]);
 
-  function setValue<K extends keyof ProfileForm>(
-    key: K,
-    value: ProfileForm[K]
-  ) {
+  function setValue<K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -204,7 +223,7 @@ export default function SetupProfilePage() {
     setError(null);
     setLoading(true);
 
-    // Compose update payload
+    // Common base
     const base = {
       profileCompleted: true,
       fullName: form.fullName ?? "",
@@ -242,11 +261,27 @@ export default function SetupProfilePage() {
         clinicAddress: form.clinicAddress ?? "",
         consultationFee: form.consultationFee ?? "",
       };
+    } else if (isCaregiver) {
+      payload = {
+        ...payload,
+        caregiverProfile: {
+          displayName: form.cgDisplayName ?? "",
+          relationshipTypes: form.cgRelationshipTypes ?? [],
+          openForRequests: Boolean(form.cgOpenForRequests),
+          notes: form.cgNotes ?? "",
+          serviceArea: form.cgServiceArea ?? "",
+          preferredLanguages: form.cgPreferredLanguages ?? [],
+          canAddDailyMeasures: form.cgCanAddDailyMeasures ?? true,
+        },
+      };
     }
 
     try {
       await updateDoc(doc(db, "users", user.uid), payload);
-      router.push(isDoctor ? "/doctor/profile" : "/patient/profile");
+      if (isDoctor) router.push("/doctor/profile");
+      else if (isPatient) router.push("/patient/profile");
+      else if (isCaregiver) router.push("/caregiver/profile");
+      else router.push("/");
     } catch (e) {
       console.error(e);
       setError("Failed to save profile. Please try again.");
@@ -255,7 +290,10 @@ export default function SetupProfilePage() {
     }
   }
 
-  // -------- Views --------
+  /* =========================
+     Step Views
+  ========================= */
+
   const Step1 = (
     <StepShell>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -274,10 +312,7 @@ export default function SetupProfilePage() {
           />
         </Field>
         <Field label="Gender" required>
-          <Select
-            value={form.gender ?? ""}
-            onChange={(e) => setValue("gender", e.target.value)}
-          >
+          <Select value={form.gender ?? ""} onChange={(e) => setValue("gender", e.target.value)}>
             <option value="">Select Gender</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
@@ -296,11 +331,7 @@ export default function SetupProfilePage() {
           </Select>
         </Field>
         <Field label="Date of Birth" required>
-          <Input
-            type="date"
-            value={form.dob ?? ""}
-            onChange={(e) => setValue("dob", e.target.value)}
-          />
+          <Input type="date" value={form.dob ?? ""} onChange={(e) => setValue("dob", e.target.value)} />
         </Field>
       </div>
     </StepShell>
@@ -325,10 +356,7 @@ export default function SetupProfilePage() {
             />
           </Field>
           <Field label="Blood Group" required>
-            <Select
-              value={form.bloodGroup ?? ""}
-              onChange={(e) => setValue("bloodGroup", e.target.value)}
-            >
+            <Select value={form.bloodGroup ?? ""} onChange={(e) => setValue("bloodGroup", e.target.value)}>
               <option value="">Select</option>
               {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((b) => (
                 <option key={b} value={b}>
@@ -365,9 +393,7 @@ export default function SetupProfilePage() {
             <Input
               placeholder="Phone"
               value={form.emergencyContactPhone ?? ""}
-              onChange={(e) =>
-                setValue("emergencyContactPhone", e.target.value)
-              }
+              onChange={(e) => setValue("emergencyContactPhone", e.target.value)}
             />
           </Field>
         </div>
@@ -386,10 +412,7 @@ export default function SetupProfilePage() {
             {chronicList.map((c) => {
               const checked = (form.chronicConditions ?? []).includes(c);
               return (
-                <label
-                  key={c}
-                  className="flex items-center gap-2 text-white/90"
-                >
+                <label key={c} className="flex items-center gap-2 text-white/90">
                   <input
                     type="checkbox"
                     className="accent-blue-400"
@@ -485,6 +508,93 @@ export default function SetupProfilePage() {
     </StepShell>
   );
 
+  const Step2Caregiver = (
+    <StepShell>
+      <div className="grid gap-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Display Name" required hint="How patients will see you (e.g., 'Aunt Nisha', 'Caregiver Nimal')">
+            <Input
+              placeholder="e.g., Caregiver Nimal"
+              value={form.cgDisplayName ?? ""}
+              onChange={(e) => setValue("cgDisplayName", e.target.value)}
+            />
+          </Field>
+          <Field label="Service Area (optional)" hint="City/region you can support">
+            <Input
+              placeholder="e.g., Colombo District"
+              value={form.cgServiceArea ?? ""}
+              onChange={(e) => setValue("cgServiceArea", e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="grid gap-3">
+          <SectionTitle>Relationship Types</SectionTitle>
+          <div className="flex flex-wrap gap-4">
+            {relationshipTypes.map((r) => (
+              <label key={r} className="flex items-center gap-2 text-white/90">
+                <input
+                  type="checkbox"
+                  className="accent-blue-400"
+                  checked={(form.cgRelationshipTypes ?? []).includes(r)}
+                  onChange={() => toggleCheckboxArray("cgRelationshipTypes", r)}
+                />
+                {r}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          <SectionTitle>Preferred Languages</SectionTitle>
+          <div className="flex flex-wrap gap-4">
+            {languageList.map((l) => (
+              <label key={l} className="flex items-center gap-2 text-white/90">
+                <input
+                  type="checkbox"
+                  className="accent-blue-400"
+                  checked={(form.cgPreferredLanguages ?? []).includes(l)}
+                  onChange={() => toggleCheckboxArray("cgPreferredLanguages", l)}
+                />
+                {l}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-white/90">
+            <input
+              type="checkbox"
+              className="accent-blue-400"
+              checked={Boolean(form.cgOpenForRequests ?? true)}
+              onChange={(e) => setValue("cgOpenForRequests", e.target.checked)}
+            />
+            Open for patient requests
+          </label>
+          <label className="flex items-center gap-2 text-white/90">
+            <input
+              type="checkbox"
+              className="accent-blue-400"
+              checked={Boolean(form.cgCanAddDailyMeasures ?? true)}
+              onChange={(e) => setValue("cgCanAddDailyMeasures", e.target.checked)}
+            />
+            Allow adding patient daily measures
+          </label>
+        </div>
+
+        <Field label="Notes (optional)" hint="Any extra info patients should know">
+          <Textarea
+            rows={3}
+            placeholder="e.g., Available weekday evenings and weekends."
+            value={form.cgNotes ?? ""}
+            onChange={(e) => setValue("cgNotes", e.target.value)}
+          />
+        </Field>
+      </div>
+    </StepShell>
+  );
+
   const Step3Review = (
     <StepShell>
       <div className="grid gap-6">
@@ -508,10 +618,8 @@ export default function SetupProfilePage() {
               <ReviewRow label="Medications" value={form.medications} />
               <ReviewRow
                 label="Emergency Contact"
-                value={`${form.emergencyContactName ?? ""} ${
-                  form.emergencyContactPhone
-                    ? "• " + form.emergencyContactPhone
-                    : ""
+                value={`${form.emergencyContactName ?? ""}${
+                  form.emergencyContactPhone ? " • " + form.emergencyContactPhone : ""
                 }`}
               />
               <ReviewRow label="Address" value={form.address} />
@@ -525,10 +633,7 @@ export default function SetupProfilePage() {
                 }
               />
               <ReviewRow label="Past Surgeries" value={form.pastSurgeries} />
-              <ReviewRow
-                label="Languages"
-                value={(form.languages ?? []).join(", ")}
-              />
+              <ReviewRow label="Languages" value={(form.languages ?? []).join(", ")} />
             </div>
           </>
         )}
@@ -540,15 +645,38 @@ export default function SetupProfilePage() {
               <ReviewRow label="Qualification" value={form.qualification} />
               <ReviewRow label="Specialty" value={form.specialty} />
               <ReviewRow label="License Number" value={form.licenseNumber} />
-              <ReviewRow
-                label="Experience (years)"
-                value={form.experienceYears}
-              />
+              <ReviewRow label="Experience (years)" value={form.experienceYears} />
               <ReviewRow label="Clinic Address" value={form.clinicAddress} />
+              <ReviewRow label="Consultation Fee" value={form.consultationFee} />
+            </div>
+          </>
+        )}
+
+        {isCaregiver && (
+          <>
+            <SectionTitle>Caregiver Details</SectionTitle>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ReviewRow label="Display Name" value={form.cgDisplayName} />
+              <ReviewRow label="Service Area" value={form.cgServiceArea} />
               <ReviewRow
-                label="Consultation Fee"
-                value={form.consultationFee}
+                label="Relationship Types"
+                value={(form.cgRelationshipTypes ?? []).join(", ")}
               />
+              <ReviewRow
+                label="Preferred Languages"
+                value={(form.cgPreferredLanguages ?? []).join(", ")}
+              />
+              <ReviewRow
+                label="Open for Requests"
+                value={String(Boolean(form.cgOpenForRequests ?? true))}
+              />
+              <ReviewRow
+                label="Can Add Daily Measures"
+                value={String(Boolean(form.cgCanAddDailyMeasures ?? true))}
+              />
+              <div className="sm:col-span-2">
+                <ReviewRow label="Notes" value={form.cgNotes} />
+              </div>
             </div>
           </>
         )}
@@ -556,43 +684,33 @@ export default function SetupProfilePage() {
     </StepShell>
   );
 
+  /* =========================
+     Render
+  ========================= */
+
+  const roleLabel = isPatient ? "patient" : isDoctor ? "doctor" : isCaregiver ? "caregiver" : "";
+
   return (
     <div className="min-h-[calc(100vh-64px)] py-10 px-4 bg-gradient-to-br from-black via-gray-900 to-gray-800">
       <div className="mx-auto max-w-4xl">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">
-            Setup Profile {role ? `(${role})` : ""}
-          </h1>
-          <p className="text-white/60 mt-1">
-            Just a few quick steps to get you ready.
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Setup Profile {roleLabel ? `(${roleLabel})` : ""}</h1>
+          <p className="text-white/60 mt-1">Just a few quick steps to get you ready.</p>
         </div>
 
         {/* Step Header */}
         <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4 ring-1 ring-white/10">
           <div className="grid grid-cols-3 items-center gap-3">
+            <StepTag icon="👤" label="Personal" step={1} active={step === 1} done={step > 1} />
             <StepTag
-              icon="👤"
-              label="Personal"
-              step={1}
-              active={step === 1}
-              done={step > 1}
-            />
-            <StepTag
-              icon={isPatient ? "❤️" : "🩺"}
-              label={isPatient ? "Health" : "Professional"}
+              icon={isPatient ? "❤️" : isDoctor ? "🩺" : "🤝"}
+              label={isPatient ? "Health" : isDoctor ? "Professional" : "Caregiver"}
               step={2}
               active={step === 2}
               done={step > 2}
             />
-            <StepTag
-              icon="✅"
-              label="Review"
-              step={3}
-              active={step === 3}
-              done={false}
-            />
+            <StepTag icon="✅" label="Review" step={3} active={step === 3} done={false} />
           </div>
           <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/10">
             <motion.div
@@ -605,9 +723,7 @@ export default function SetupProfilePage() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-red-200">
-            {error}
-          </div>
+          <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-red-200">{error}</div>
         )}
 
         {/* Steps */}
@@ -624,6 +740,7 @@ export default function SetupProfilePage() {
               {Step1}
             </motion.div>
           )}
+
           {step === 2 && isPatient && (
             <motion.div
               key="step2-patient"
@@ -636,6 +753,7 @@ export default function SetupProfilePage() {
               {Step2Patient}
             </motion.div>
           )}
+
           {step === 2 && isDoctor && (
             <motion.div
               key="step2-doctor"
@@ -648,6 +766,20 @@ export default function SetupProfilePage() {
               {Step2Doctor}
             </motion.div>
           )}
+
+          {step === 2 && isCaregiver && (
+            <motion.div
+              key="step2-caregiver"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              className="mb-6"
+            >
+              {Step2Caregiver}
+            </motion.div>
+          )}
+
           {step === 3 && (
             <motion.div
               key="step3"
@@ -676,16 +808,16 @@ export default function SetupProfilePage() {
             <button
               onClick={() => {
                 if (step === 1 && !step1Valid) {
-                  setError(
-                    "Please complete all required fields in Personal Info."
-                  );
+                  setError("Please complete all required fields in Personal Info.");
                   return;
                 }
                 if (step === 2 && !step2Valid) {
                   setError(
                     isPatient
                       ? "Please complete Height, Weight, and Blood Group."
-                      : "Please complete Qualification, Specialty, and License Number."
+                      : isDoctor
+                      ? "Please complete Qualification, Specialty, and License Number."
+                      : "Please provide a Display Name."
                   );
                   return;
                 }
@@ -714,12 +846,8 @@ export default function SetupProfilePage() {
 function ReviewRow({ label, value }: { label: string; value?: string }) {
   return (
     <div className="flex flex-col rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-      <span className="text-xs uppercase tracking-wide text-white/50">
-        {label}
-      </span>
-      <span className="text-sm text-white/90">
-        {value && value !== "" ? value : "-"}
-      </span>
+      <span className="text-xs uppercase tracking-wide text-white/50">{label}</span>
+      <span className="text-sm text-white/90">{value && value !== "" ? value : "-"}</span>
     </div>
   );
 }
